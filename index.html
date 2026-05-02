@@ -500,12 +500,12 @@ select option{background:var(--bg2)}
   <div class="error-msg" id="loginError">Email ou senha inválidos</div>
   <div class="form-group">
     <label>Email</label>
-    <input type="email" id="loginEmail" placeholder="seu@email.com" >
+    <input type="email" id="loginEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')handleLoginBtn()">
   </div>
   <div class="form-group">
     <label>Senha</label>
     <div style="position:relative">
-      <input type="password" id="loginPass" placeholder="••••••••" style="padding-right:40px;width:100%">
+      <input type="password" id="loginPass" placeholder="••••••••" style="padding-right:40px;width:100%" onkeydown="if(event.key==='Enter')handleLoginBtn()">
       <button onclick="toggleSenhaVisivel('loginPass',this)" type="button" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);padding:0;display:flex;align-items:center">
         <svg id="loginPass_eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
@@ -514,7 +514,7 @@ select option{background:var(--bg2)}
   <div style="text-align:right;margin-top:-8px;margin-bottom:12px">
     <button onclick="openModal('modalEsqueciSenha')" type="button" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:12px;padding:0">Esqueci minha senha</button>
   </div>
-  <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="doLogin()">Entrar</button>
+  <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="handleLoginBtn()">Entrar</button>
 
 </div>
 </div>
@@ -8277,6 +8277,43 @@ function abrirModalNovoUsuario(){
   const btn = document.querySelector('#modalUsuario .btn-primary');
   if(btn){ btn.textContent='Criar Usuário'; btn.onclick=saveUsuario; btn.disabled=false; }
   openModal('modalUsuario');
+}
+
+
+async function handleLoginBtn(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  if(!email||!pass){
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('loginError').textContent='Preencha email e senha.';
+    return;
+  }
+  // Try API
+  try {
+    const r = await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,senha:pass})});
+    const d = await r.json();
+    if(d.token){
+      authToken = d.token;
+      localStorage.setItem('wf_token', d.token);
+      localStorage.setItem('wf_user', JSON.stringify(d.user));
+      currentUser = d.user;
+      // Add to DB.users if not there
+      if(!DB.users.find(u=>u.id===d.user.id)) DB.users.push(d.user);
+      document.getElementById('loginError').style.display='none';
+      document.getElementById('loginWrap').style.display='none';
+      document.getElementById('appWrap').style.display='flex';
+      setupSidebar();
+      navigateDefault();
+      setTimeout(()=>{ syncPedidos(); syncLeads(); syncUsuarios(); }, 500);
+      return;
+    }
+    // API returned error
+    document.getElementById('loginError').style.display='block';
+    document.getElementById('loginError').textContent = d.error||'Email ou senha inválidos';
+  } catch(e){
+    // API offline - fallback to local
+    doLogin();
+  }
 }
 
 // ===== MODALS =====
