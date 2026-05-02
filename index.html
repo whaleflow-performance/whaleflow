@@ -110,20 +110,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   if(authToken && savedUser) {
     try {
       const u = JSON.parse(savedUser);
-      // Verify token still valid by checking usuarios API
-      const check = await api.get('/api/usuarios');
-      if(check !== null) {
-        // Token valid - auto login
-        const demoUser = DB.users.find(x=>x.email===u.email) || u;
-        currentUser = {...demoUser, ...u};
+      // Verify token by decoding it locally (no API call needed)
+      const payload = JSON.parse(atob(authToken.split('.')[1]));
+      const expired = payload.exp * 1000 < Date.now();
+      if(!expired) {
+        // Token still valid - auto login
+        currentUser = u;
         document.getElementById('loginWrap').style.display = 'none';
         document.getElementById('appWrap').style.display = 'flex';
         setupSidebar();
         navigateDefault();
         setTimeout(()=>{ fullSync(); }, 500);
         return;
+      } else {
+        // Token expired - clear and show login
+        localStorage.removeItem('wf_token');
+        localStorage.removeItem('wf_user');
+        authToken = null;
       }
-    } catch(e) {}
+    } catch(e) {
+      localStorage.removeItem('wf_token');
+      localStorage.removeItem('wf_user');
+      authToken = null;
+    }
   }
 
   // Override login button
