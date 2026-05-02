@@ -563,6 +563,8 @@ select option{background:var(--bg2)}
 .kb-sp-action-btn.blue{background:var(--blue-bg);color:var(--blue);border-color:rgba(79,124,255,.3)}
 .kb-sp-action-btn.red{background:var(--red-bg);color:var(--red);border-color:rgba(245,101,101,.3)}
 .kb-sp-action-btn.amber{background:var(--amber-bg);color:var(--amber);border-color:rgba(245,166,35,.3)}
+
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 /* Responsive */
 @media(max-width:900px){
   .charts-row{grid-template-columns:1fr}
@@ -8420,6 +8422,44 @@ async function handleLoginBtn(){
     // API offline - fallback to local
     doLogin();
   }
+}
+
+
+function refreshCurrentPage(){
+  const btn = document.getElementById('refresh_btn');
+  if(btn) btn.style.animation='spin .6s linear';
+  setTimeout(()=>{ if(btn) btn.style.animation=''; }, 600);
+
+  // Re-run the current page render
+  const active = document.querySelector('.page.active');
+  if(!active) return;
+  const pageId = active.id.replace('page-','');
+
+  const renderMap = {
+    'dashboard':       ()=>renderAdminDash(),
+    'clientes-pedidos':()=>{ syncPedidos(); renderClientesPedidos(); },
+    'kanban':          ()=>{ syncLeads(); renderKanban(); },
+    'followup-leads':  ()=>renderFollowupLeads(),
+    'frustracoes':     ()=>{ syncFrustracoes(); renderFrustracoes(); },
+    'equipe':          ()=>{ syncUsuarios(); renderEquipe(); },
+    'produtos':        ()=>{ syncProdutos(); renderProdutos(); },
+    'planos':          ()=>{ syncProdutos(); renderPlanos(); },
+    'historico':       ()=>renderHistoricoLancamentos(),
+    'resultado-diario':()=>renderResultadoDiario(),
+    'pnl':             ()=>renderPnl(),
+    'ranking':         ()=>renderRanking(),
+    'aprovacoes':      ()=>renderAprovacoes(),
+    'rastreamento':    ()=>renderRastreamento(),
+    'taxas':           ()=>renderTaxas(),
+    'integracoes':     ()=>renderIntegracoes(),
+    'cobrador':        ()=>renderCobradorDash(),
+    'vendedor':        ()=>renderVendedorDash(),
+    'afiliado':        ()=>renderAfiladoDash(),
+    'followup':        ()=>renderFollowup(),
+    'agenda':          ()=>renderAgenda(),
+  };
+
+  if(renderMap[pageId]) renderMap[pageId]();
 }
 
 // ===== MODALS =====
