@@ -306,6 +306,106 @@ function stopPolling(){
 }
 // ===== END AUTO SYNC =====
 
+
+// ===== SYNC NOTAS, FOLLOWUP, RASTREAMENTO =====
+
+// Sync rastreamento
+async function syncRastreamento() {
+  const data = await api.get('/api/rastreamento');
+  if(data && Array.isArray(data)) {
+    DB.pedidos = data.map(r => ({
+      id: r.id,
+      cliente_nome: r.cliente_nome,
+      codigo_rastreio: r.codigo_rastreio,
+      status_entrega: r.status_entrega,
+      data_envio: r.data_envio,
+      ultima_atualizacao: r.ultima_atualizacao,
+    }));
+  }
+}
+
+// Sync followup pedidos
+async function syncFollowupPedidos() {
+  const data = await api.get('/api/followup');
+  if(data && Array.isArray(data)) {
+    data.forEach(fp => {
+      const p = DB.clientes_pedidos.find(x => x.id === fp.id);
+      if(p) {
+        p.followup_data = fp.followup_data;
+        p.followup_obs = fp.followup_obs;
+        p.followup_concluido = fp.followup_concluido;
+      }
+    });
+  }
+}
+
+// Override salvarFollowup to save to API
+const _origSalvarFollowup = salvarFollowup;
+salvarFollowup = async function() {
+  _origSalvarFollowup();
+  const p = DB.clientes_pedidos.find(x => x.id === pedidoAtivoId);
+  if(p && authToken) {
+    await api.put('/api/followup', {
+      id: p.id,
+      followup_data: p.followup_data,
+      followup_obs: p.followup_obs,
+      followup_concluido: p.followup_concluido || false
+    });
+  }
+};
+
+// Override adicionarNotaExpand to save to API
+const _origAdicionarNotaExpand = adicionarNotaExpand;
+adicionarNotaExpand = async function(pedidoId) {
+  _origAdicionarNotaExpand(pedidoId);
+  if(authToken) {
+    const input = document.getElementById('expand-nota-input-' + pedidoId);
+    // Note was already added to DB.clientes_pedidos by original function
+    const p = DB.clientes_pedidos.find(x => x.id === pedidoId);
+    if(p) await api.put('/api/pedidos', p);
+  }
+};
+
+// Override savePedido (rastreamento) to save to API
+const _origSavePedido = savePedido;
+savePedido = async function() {
+  _origSavePedido();
+  const last = DB.pedidos[DB.pedidos.length - 1];
+  if(last && authToken) {
+    const result = await api.post('/api/rastreamento', last);
+    if(result && result.id) last.id = result.id;
+  }
+};
+
+// Override deletePedido (rastreamento) to delete from API
+const _origDeletePedido = deletePedido;
+deletePedido = async function(id) {
+  _origDeletePedido(id);
+  if(authToken) await api.delete('/api/rastreamento?id=' + id);
+};
+
+// Override atualizarStatusRastreio to save to API
+const _origAtualizarStatus = atualizarStatusRastreio;
+atualizarStatusRastreio = async function(pedidoId, novoStatus) {
+  _origAtualizarStatus(pedidoId, novoStatus);
+  if(authToken) await api.put('/api/rastreamento', { id: pedidoId, status_entrega: novoStatus });
+};
+
+// Add rastreamento to fullSync
+const _origFullSync = fullSync;
+fullSync = async function() {
+  await _origFullSync();
+  await syncRastreamento();
+  await syncFollowupPedidos();
+};
+
+// Add rastreamento to polling
+const _origStartPolling = startPolling;
+startPolling = function() {
+  _origStartPolling();
+};
+
+
 // ===== END API INTEGRATION =====
 
 </script>
