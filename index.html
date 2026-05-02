@@ -500,11 +500,19 @@ select option{background:var(--bg2)}
   <div class="error-msg" id="loginError">Email ou senha inválidos</div>
   <div class="form-group">
     <label>Email</label>
-    <input type="email" id="loginEmail" placeholder="seu@email.com" value="admin@whaleflow.com">
+    <input type="email" id="loginEmail" placeholder="seu@email.com" >
   </div>
   <div class="form-group">
     <label>Senha</label>
-    <input type="password" id="loginPass" placeholder="••••••••" value="123456">
+    <div style="position:relative">
+      <input type="password" id="loginPass" placeholder="••••••••" style="padding-right:40px;width:100%">
+      <button onclick="toggleSenhaVisivel('loginPass',this)" type="button" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);padding:0;display:flex;align-items:center">
+        <svg id="loginPass_eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+  </div>
+  <div style="text-align:right;margin-top:-8px;margin-bottom:12px">
+    <button onclick="openModal('modalEsqueciSenha')" type="button" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:12px;padding:0">Esqueci minha senha</button>
   </div>
   <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="doLogin()">Entrar</button>
 
@@ -904,7 +912,7 @@ select option{background:var(--bg2)}
       <div style="font-size:20px;font-weight:700;color:var(--text)">Usuários</div>
       <div style="font-size:12px;color:var(--text3);margin-top:2px">Gerencie os colaboradores e seus acessos</div>
     </div>
-    <button class="btn btn-primary" onclick="openModal('modalUsuario')" style="display:flex;align-items:center;gap:6px;border-radius:8px">
+    <button class="btn btn-primary" onclick="abrirModalNovoUsuario()" style="display:flex;align-items:center;gap:6px;border-radius:8px">
       <span style="font-size:18px;line-height:1">+</span> Novo Usuário
     </button>
   </div>
@@ -8208,6 +8216,69 @@ function executarRejeicao(){
   renderAdminDash();
 }
 
+
+function toggleSenhaVisivel(inputId, btn){
+  const input = document.getElementById(inputId);
+  const eye   = document.getElementById(inputId+'_eye');
+  if(!input) return;
+  if(input.type==='password'){
+    input.type='text';
+    if(eye) eye.innerHTML='<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    input.type='password';
+    if(eye) eye.innerHTML='<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
+}
+
+async function enviarRecuperacaoSenha(){
+  const email = document.getElementById('rec_email').value.trim();
+  const msg   = document.getElementById('rec_msg');
+  const btn   = document.getElementById('rec_btn');
+  if(!email){ 
+    msg.style.display='block'; msg.style.color='var(--red)'; 
+    msg.textContent='Informe seu email.'; return; 
+  }
+  btn.textContent='Enviando...'; btn.disabled=true;
+  try {
+    const r = await fetch('/api/recuperar-senha', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email})
+    });
+    const d = await r.json();
+    msg.style.display='block';
+    if(r.ok){
+      msg.style.color='var(--green)';
+      msg.textContent='✓ Link enviado! Verifique seu email.';
+      btn.textContent='Enviado!';
+    } else {
+      msg.style.color='var(--red)';
+      msg.textContent=d.error||'Erro ao enviar. Tente novamente.';
+      btn.textContent='Enviar Link'; btn.disabled=false;
+    }
+  } catch(e){
+    msg.style.display='block'; msg.style.color='var(--red)';
+    msg.textContent='Erro de conexão. Tente novamente.';
+    btn.textContent='Enviar Link'; btn.disabled=false;
+  }
+}
+
+
+function abrirModalNovoUsuario(){
+  // Reset all fields
+  document.getElementById('u_nome').value = '';
+  document.getElementById('u_email').value = '';
+  document.getElementById('u_senha').value = '';
+  document.getElementById('u_tipo').value = 'VENDEDOR';
+  toggleVendedorSelect();
+  // Reset checkboxes
+  document.querySelectorAll('#vendedoresCheckboxes input[type=checkbox]').forEach(cb=>cb.checked=false);
+  // Reset save button
+  const btn = document.querySelector('#modalUsuario .btn-primary');
+  if(btn){ btn.textContent='Criar Usuário'; btn.onclick=saveUsuario; btn.disabled=false; }
+  openModal('modalUsuario');
+}
+
 // ===== MODALS =====
 function openModal(id){
   document.getElementById(id).classList.add('open');
@@ -8263,7 +8334,11 @@ function loadPlanosPedido(){
   };
   infoDiv.style.display='none';
 }
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeModal(id){
+  if(id==='modalUsuario'){
+    const btn=document.querySelector('#modalUsuario .btn-primary');
+    if(btn){ btn.textContent='Criar Usuário'; btn.onclick=saveUsuario; btn.disabled=false; }
+  }document.getElementById(id).classList.remove('open');}
 document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
 
 // ===== INIT =====
@@ -9236,6 +9311,33 @@ document.getElementById('appWrap').style.display='none';
   <div style="display:flex;gap:10px;justify-content:flex-end">
     <button class="btn btn-ghost" onclick="closeModal('modalRejeitarPagamento')">Cancelar</button>
     <button class="btn" style="background:var(--red);color:#fff;border-color:var(--red);border-radius:6px" onclick="executarRejeicao()">Confirmar Rejeição</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL: ESQUECI SENHA -->
+<div class="modal-overlay" id="modalEsqueciSenha">
+<div class="modal" style="width:420px">
+  <div class="modal-title">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:30px;height:30px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      </div>
+      Recuperar Senha
+    </div>
+    <button class="modal-close" onclick="closeModal('modalEsqueciSenha')">×</button>
+  </div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:16px">
+    Digite seu email cadastrado e enviaremos um link para redefinir sua senha.
+  </div>
+  <div class="form-group" style="margin-bottom:4px">
+    <label>Email</label>
+    <input type="email" id="rec_email" placeholder="seu@email.com">
+  </div>
+  <div id="rec_msg" style="font-size:12px;margin-top:8px;display:none"></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+    <button class="btn btn-ghost" onclick="closeModal('modalEsqueciSenha')">Cancelar</button>
+    <button class="btn btn-primary" onclick="enviarRecuperacaoSenha()" id="rec_btn">Enviar Link</button>
   </div>
 </div>
 </div>
