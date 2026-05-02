@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Token still valid - auto login
         currentUser = u;
         document.getElementById('loginWrap').style.display = 'none';
-        document.getElementById('appWrap').style.display = 'flex';
+        document.getElementById('appWrap').style.cssText = 'display:flex;width:100%';
         setupSidebar();
         navigateDefault();
         setTimeout(()=>{ fullSync(); }, 500);
@@ -613,7 +613,7 @@ select option{background:var(--bg2)}
 </div>
 
 <!-- APP -->
-<div id="appWrap" style="display:none;width:100%;display:flex">
+<div id="appWrap" style="display:none;width:100%">
 
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
