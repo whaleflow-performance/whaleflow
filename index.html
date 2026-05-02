@@ -4,7 +4,165 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WhaleFlow — Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+// ===== API INTEGRATION =====
+const API_URL = '';
+let authToken = localStorage.getItem('wf_token') || null;
+
+const api = {
+  async req(method, path, body=null) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(authToken ? {'Authorization': 'Bearer '+authToken} : {}) }
+    };
+    if(body) opts.body = JSON.stringify(body);
+    try {
+      const r = await fetch(API_URL + path, opts);
+      const data = await r.json();
+      if(r.status===401){ logout(); return null; }
+      return data;
+    } catch(e) {
+      console.warn('API offline, usando dados locais:', e.message);
+      return null;
+    }
+  },
+  get:    (path)       => api.req('GET', path),
+  post:   (path, body) => api.req('POST', path, body),
+  put:    (path, body) => api.req('PUT', path, body),
+  delete: (path)       => api.req('DELETE', path),
+};
+
+// Override login to use real API
+async function loginWithAPI(email, senha) {
+  const result = await api.post('/api/auth', {email, senha});
+  if(result && result.token) {
+    authToken = result.token;
+    localStorage.setItem('wf_token', result.token);
+    localStorage.setItem('wf_user', JSON.stringify(result.user));
+    return result.user;
+  }
+  return null;
+}
+
+// Sync pedidos from DB on load
+async function syncPedidos() {
+  const data = await api.get('/api/pedidos');
+  if(data && Array.isArray(data) && data.length > 0) {
+    // Merge with local - API data takes priority
+    DB.clientes_pedidos = data.map(p => ({
+      ...p,
+      notas: p.notas || [],
+      links: p.links || [],
+      suspenso: p.suspenso || false,
+    }));
+    renderClientesPedidos();
+  }
+}
+
+// Sync leads from DB on load
+async function syncLeads() {
+  const data = await api.get('/api/leads');
+  if(data && Array.isArray(data) && data.length > 0) {
+    DB.leads = data.map(l => ({
+      ...l,
+      notas: l.notas || [],
+    }));
+    if(document.getElementById('page-kanban')?.classList.contains('active')) renderKanban();
+  }
+}
+
+// Sync usuarios from DB on load
+async function syncUsuarios() {
+  if(currentUser?.tipo !== 'ADMIN') return;
+  const data = await api.get('/api/usuarios');
+  if(data && Array.isArray(data) && data.length > 0) {
+    // Keep demo users structure but add real ones
+    DB.users = data.map(u => ({
+      ...u,
+      vendedores: u.vendedores || [],
+      cobradores: u.cobradores || [],
+      senha: '***'
+    }));
+    if(document.getElementById('page-equipe')?.classList.contains('active')) renderEquipe();
+  }
+}
+
+// Auto-save pedido to API when changed
+const _origMarcarStatus = marcarStatusPedido;
+marcarStatusPedido = async function(status) {
+  _origMarcarStatus(status);
+  const p = DB.clientes_pedidos.find(x=>x.id===pedidoAtivoId);
+  if(p) await api.put('/api/pedidos', p);
+};
+
+// Auto-save lead when moved
+const _origMoveLead = moveLead;
+moveLead = function(leadId, newStatus, skipConfirm=false) {
+  _origMoveLead(leadId, newStatus, skipConfirm);
+  const l = DB.leads.find(x=>x.id===leadId);
+  if(l && l.id < 10000) api.put('/api/leads', l); // only sync real DB leads
+};
+
+// Intercept login button
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check if already logged in via token
+  const savedUser = localStorage.getItem('wf_user');
+  if(authToken && savedUser) {
+    try {
+      const u = JSON.parse(savedUser);
+      // Verify token still valid
+      const check = await api.get('/api/pedidos');
+      if(check !== null) {
+        // Token valid - auto login
+        const demoUser = DB.users.find(x=>x.email===u.email) || u;
+        currentUser = {...demoUser, ...u};
+        document.getElementById('loginWrap').style.display = 'none';
+        document.getElementById('appWrap').style.display = 'flex';
+        setupSidebar();
+        navigateDefault();
+        setTimeout(()=>{ syncPedidos(); syncLeads(); syncUsuarios(); }, 500);
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // Override login button
+  const loginBtn = document.querySelector('#loginWrap button[onclick="handleLogin()"]') ||
+                   document.querySelector('#loginWrap .btn-primary');
+  if(loginBtn) {
+    const origOnclick = loginBtn.getAttribute('onclick');
+    loginBtn.onclick = async function() {
+      const email = document.getElementById('loginEmail')?.value;
+      const senha = document.getElementById('loginSenha')?.value;
+      
+      // Try API first
+      const apiUser = await loginWithAPI(email, senha);
+      if(apiUser) {
+        const demoUser = DB.users.find(x=>x.email===email) || apiUser;
+        currentUser = {...demoUser, ...apiUser};
+        document.getElementById('loginError').style.display='none';
+        document.getElementById('loginWrap').style.display='none';
+        document.getElementById('appWrap').style.display='flex';
+        setupSidebar();
+        navigateDefault();
+        setTimeout(()=>{ syncPedidos(); syncLeads(); syncUsuarios(); }, 500);
+      } else {
+        // Fallback to local login
+        handleLogin();
+      }
+    };
+  }
+});
+
+function logout() {
+  authToken = null;
+  localStorage.removeItem('wf_token');
+  localStorage.removeItem('wf_user');
+  location.reload();
+}
+// ===== END API INTEGRATION =====
+
+</script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
