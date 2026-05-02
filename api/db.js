@@ -102,6 +102,17 @@ export async function setupDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS rastreamentos (
+      id SERIAL PRIMARY KEY,
+      cliente_nome TEXT,
+      codigo_rastreio TEXT,
+      status_entrega TEXT DEFAULT 'PENDENTE',
+      data_envio DATE,
+      ultima_atualizacao DATE DEFAULT CURRENT_DATE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`;
+
   return true;
 }
 
