@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const origOnclick = loginBtn.getAttribute('onclick');
     loginBtn.onclick = async function() {
       const email = document.getElementById('loginEmail')?.value;
-      const senha = document.getElementById('loginSenha')?.value;
+      const senha = document.getElementById('loginPass')?.value || document.getElementById('loginPass')?.value;
       
       // Try API first
       const apiUser = await loginWithAPI(email, senha);
