@@ -519,6 +519,48 @@ confirmarPerdaExecutar = async function() {
 };
 
 
+
+// ===== SYNC USUARIOS EDIÇÃO =====
+
+// Override editarUsuario save button to use API
+const _origEditarUsuario = editarUsuario;
+editarUsuario = function(id) {
+  _origEditarUsuario(id);
+  // Override the update button to also call API
+  setTimeout(()=>{
+    const btn = document.querySelector('#modalUsuario .btn-primary');
+    if(btn && btn.textContent === 'Atualizar'){
+      const origOnclick = btn.onclick;
+      btn.onclick = async function() {
+        origOnclick();
+        if(authToken) {
+          const u = DB.users.find(x=>x.id===id);
+          if(u) {
+            const senha = document.getElementById('u_senha')?.value;
+            await api.put('/api/usuarios', {
+              id: u.id,
+              nome: u.nome,
+              email: u.email,
+              tipo: u.tipo,
+              vendedores: u.vendedores||[],
+              cobradores: u.cobradores||[],
+              ...(senha ? {senha} : {})
+            });
+          }
+        }
+      };
+    }
+  }, 100);
+};
+
+// Override deleteUser to delete from API
+const _origDeleteUser = deleteUser;
+deleteUser = async function(id) {
+  _origDeleteUser(id);
+  if(authToken) await api.delete('/api/usuarios?id='+id);
+};
+
+
 // ===== END API INTEGRATION =====
 
 </script>
