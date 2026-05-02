@@ -14,8 +14,32 @@ export async function setupDB() {
       cobradores JSONB DEFAULT '[]',
       comissao_pct INTEGER DEFAULT 30,
       created_at TIMESTAMP DEFAULT NOW()
-    )
-  `;
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS produtos (
+      id SERIAL PRIMARY KEY,
+      nome TEXT NOT NULL,
+      descricao TEXT,
+      estoque_controlado BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS planos (
+      id SERIAL PRIMARY KEY,
+      produto_id INTEGER REFERENCES produtos(id) ON DELETE CASCADE,
+      nome TEXT NOT NULL,
+      preco NUMERIC DEFAULT 0,
+      quantidade INTEGER DEFAULT 1,
+      unidade TEXT DEFAULT 'un',
+      estoque INTEGER,
+      comissao_afil NUMERIC,
+      custo_produto NUMERIC,
+      frete NUMERIC,
+      inativo BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS pedidos (
@@ -43,9 +67,9 @@ export async function setupDB() {
       followup_data DATE,
       followup_obs TEXT,
       followup_concluido BOOLEAN DEFAULT FALSE,
+      comprovante JSONB,
       created_at TIMESTAMP DEFAULT NOW()
-    )
-  `;
+    )`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS leads (
@@ -62,8 +86,21 @@ export async function setupDB() {
       followup_concluido BOOLEAN DEFAULT FALSE,
       notas JSONB DEFAULT '[]',
       created_at TIMESTAMP DEFAULT NOW()
-    )
-  `;
+    )`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS frustracoes (
+      id SERIAL PRIMARY KEY,
+      tipo TEXT NOT NULL,
+      pedido_nome TEXT,
+      valor NUMERIC DEFAULT 0,
+      motivo TEXT,
+      obs TEXT,
+      status TEXT DEFAULT 'PENDENTE',
+      vendedor_id INTEGER,
+      data DATE DEFAULT CURRENT_DATE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`;
 
   return true;
 }
