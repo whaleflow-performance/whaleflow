@@ -83,7 +83,7 @@ async function syncUsuarios() {
       cobradores: u.cobradores || [],
       senha: '***'
     }));
-    if(document.getElementById('page-equipe')?.classList.contains('active')) renderEquipe();
+    renderEquipe();
   }
 }
 
@@ -110,8 +110,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if(authToken && savedUser) {
     try {
       const u = JSON.parse(savedUser);
-      // Verify token still valid
-      const check = await api.get('/api/pedidos');
+      // Verify token still valid by checking usuarios API
+      const check = await api.get('/api/usuarios');
       if(check !== null) {
         // Token valid - auto login
         const demoUser = DB.users.find(x=>x.email===u.email) || u;
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('appWrap').style.display = 'flex';
         setupSidebar();
         navigateDefault();
-        setTimeout(()=>{ syncPedidos(); syncLeads(); syncUsuarios(); }, 500);
+        setTimeout(()=>{ fullSync(); }, 500);
         return;
       }
     } catch(e) {}
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('appWrap').style.display='flex';
         setupSidebar();
         navigateDefault();
-        setTimeout(()=>{ syncPedidos(); syncLeads(); syncUsuarios(); }, 500);
+        setTimeout(()=>{ fullSync(); }, 500);
       } else {
         // Fallback to local login
         handleLogin();
@@ -160,6 +160,90 @@ function logout() {
   localStorage.removeItem('wf_user');
   location.reload();
 }
+
+// ===== SYNC FUNCTIONS =====
+
+// Sync produtos from DB
+async function syncProdutos() {
+  const data = await api.get('/api/produtos');
+  if(data && data.produtos) {
+    DB.produtos = data.produtos.map(p => ({
+      ...p,
+      planos: data.planos.filter(pl => pl.produto_id === p.id).map(pl => ({
+        ...pl,
+        id: pl.id,
+        nome: pl.nome,
+        preco: parseFloat(pl.preco)||0,
+        estoque: pl.estoque,
+        comissao_afil: pl.comissao_afil ? parseFloat(pl.comissao_afil) : null,
+        custo_produto: pl.custo_produto ? parseFloat(pl.custo_produto) : null,
+        frete: pl.frete ? parseFloat(pl.frete) : null,
+      }))
+    }));
+  }
+}
+
+// Sync frustracoes
+async function syncFrustracoes() {
+  const data = await api.get('/api/frustracoes');
+  if(data && Array.isArray(data)) DB.frustracoes = data;
+}
+
+// Auto-save pedido to API
+async function savePedidoAPI(pedido) {
+  if(!authToken) return;
+  if(pedido.id && pedido.id < 10000) {
+    // Existing DB record - update
+    await api.put('/api/pedidos', pedido);
+  }
+}
+
+// Auto-save lead to API  
+async function saveLeadAPI(lead) {
+  if(!authToken || !lead) return;
+  if(lead.id && lead.id < 10000) {
+    await api.put('/api/leads', lead);
+  }
+}
+
+// Override saveClientePedido to also save to API
+const _origSaveClientePedido = saveClientePedido;
+saveClientePedido = async function() {
+  _origSaveClientePedido();
+  // Get the last created pedido and save to API
+  const lastPed = DB.clientes_pedidos[DB.clientes_pedidos.length-1];
+  if(lastPed && authToken) {
+    const result = await api.post('/api/pedidos', lastPed);
+    if(result && result.id) {
+      // Update local id to DB id
+      lastPed._dbId = result.id;
+    }
+  }
+};
+
+// Override saveFrustracao to save to API
+const _origSaveFrustracao = saveFrustracao;
+saveFrustracao = async function() {
+  _origSaveFrustracao();
+  const lastF = DB.frustracoes[0];
+  if(lastF && authToken) {
+    await api.post('/api/frustracoes', lastF);
+  }
+};
+
+// Full sync on login
+async function fullSync() {
+  await Promise.all([
+    syncPedidos(),
+    syncLeads(),
+    syncUsuarios(),
+    syncProdutos(),
+    syncFrustracoes(),
+  ]);
+}
+
+// ===== END SYNC FUNCTIONS =====
+
 // ===== END API INTEGRATION =====
 
 </script>
@@ -3342,12 +3426,28 @@ function toggleVendedorSelect(){
     document.getElementById('vendedoresCheckboxes').innerHTML=vends.map(v=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="${v.id}" style="width:auto;margin:0"> ${v.nome}</label>`).join('');
   }
 }
-function saveUsuario(){
-  const tipo=document.getElementById('u_tipo').value;
-  const vendedoresSel=tipo==='COBRADOR'?Array.from(document.querySelectorAll('#vendedoresCheckboxes input:checked')).map(c=>parseInt(c.value)):[];
-  const comissaoPct=null;
-  const u={id:DB.nextId++,nome:document.getElementById('u_nome').value,email:document.getElementById('u_email').value,senha:document.getElementById('u_senha').value,tipo,vendedores:vendedoresSel,cobradores:[],comissao_pct:comissaoPct};
-  DB.users.push(u);
+async function saveUsuario(){
+  const tipo  = document.getElementById('u_tipo').value;
+  const nome  = document.getElementById('u_nome').value.trim();
+  const email = document.getElementById('u_email').value.trim();
+  const senha = document.getElementById('u_senha').value;
+  if(!nome||!email||!senha){ alert('Preencha nome, email e senha.'); return; }
+  const vendedoresSel = tipo==='COBRADOR'?Array.from(document.querySelectorAll('#vendedoresCheckboxes input:checked')).map(c=>parseInt(c.value)):[];
+
+  const btn = document.querySelector('#modalUsuario .btn-primary');
+  if(btn){ btn.textContent='Salvando...'; btn.disabled=true; }
+
+  // Try API first
+  const result = await api.post('/api/usuarios', {nome, email, senha, tipo, vendedores: vendedoresSel, cobradores:[], comissao_pct:30});
+
+  if(result && result.id){
+    // Saved in DB - add to local
+    DB.users.push({...result, senha:'***'});
+  } else {
+    // Fallback - save locally only
+    DB.users.push({id:DB.nextId++, nome, email, senha, tipo, vendedores:vendedoresSel, cobradores:[], comissao_pct:30});
+  }
+
   closeModal('modalUsuario');
   renderEquipe();
 }
@@ -8301,7 +8401,7 @@ async function handleLoginBtn(){
       document.getElementById('appWrap').style.display='flex';
       setupSidebar();
       navigateDefault();
-      setTimeout(()=>{ syncPedidos(); syncLeads(); syncUsuarios(); }, 500);
+      setTimeout(()=>{ fullSync(); }, 500);
       return;
     }
     // API returned error
