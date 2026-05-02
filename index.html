@@ -2297,62 +2297,9 @@ const fmtDate = d => new Date(d).toLocaleDateString('pt-BR');
 
 let DB = {
   users: [
-    {id:1,nome:'Admin Geral',email:'admin@whaleflow.com',senha:'123456',tipo:'ADMIN',vendedores:[]},
-    {id:2,nome:'Carlos Vendas',email:'vendedor@whaleflow.com',senha:'123456',tipo:'VENDEDOR',vendedores:[]},
-    {id:3,nome:'Ana Cobrança',email:'cobrador@whaleflow.com',senha:'123456',tipo:'COBRADOR',vendedores:[2,4]},
-    {id:4,nome:'Roberto Silva',email:'roberto@whaleflow.com',senha:'123456',tipo:'VENDEDOR',vendedores:[]},
-    {id:5,nome:'Paula Mendes',email:'paula@whaleflow.com',senha:'123456',tipo:'COBRADOR',vendedores:[2],afiliado_id:6,dist_pct:50},
-    {id:6,nome:'João Afiliado',email:'afiliado@whaleflow.com',senha:'123456',tipo:'AFILIADO',vendedores:[],cobradores:[5],comissao_pct:30,payt_token:'payt_afil_joao_abc123',payt_url_sufixo:'joao-afiliado'},
+    {id:1,nome:'Admin',email:'admin@whaleflow.com',senha:'123456',tipo:'ADMIN',vendedores:[],cobradores:[],comissao_pct:30},
   ],
-  vendas: [
-    {id:1,cliente_nome:'Empresa ABC',valor:4500,status:'PAGO',vendedor_id:2,cobrador_id:3,data_criacao:'2025-04-25',data_pagamento:'2025-04-25',data_agendada:null},
-    {id:2,cliente_nome:'João Ferreira',valor:1200,status:'AGENDADO',vendedor_id:2,cobrador_id:3,data_criacao:'2025-04-26',data_pagamento:null,data_agendada:'2025-04-30'},
-    {id:3,cliente_nome:'Tech Solutions',valor:8900,status:'PAGO',vendedor_id:4,cobrador_id:3,data_criacao:'2025-04-24',data_pagamento:'2025-04-28',data_agendada:null},
-    {id:4,cliente_nome:'Maria Oliveira',valor:650,status:'ABERTO',vendedor_id:2,cobrador_id:5,data_criacao:'2025-04-22',data_pagamento:null,data_agendada:null},
-    {id:5,cliente_nome:'Distribuidora XYZ',valor:12400,status:'PAGO',vendedor_id:4,cobrador_id:3,data_criacao:'2025-04-20',data_pagamento:'2025-04-29',data_agendada:null},
-    {id:6,cliente_nome:'Pedro Santos',valor:3200,status:'AGENDADO',vendedor_id:2,cobrador_id:5,data_criacao:'2025-04-27',data_pagamento:null,data_agendada:'2025-05-02'},
-    {id:7,cliente_nome:'Logística Fast',valor:5600,status:'ABERTO',vendedor_id:4,cobrador_id:3,data_criacao:'2025-04-23',data_pagamento:null,data_agendada:null},
-    {id:8,cliente_nome:'Construtora Norte',valor:18000,status:'PAGO',vendedor_id:2,cobrador_id:5,data_criacao:'2025-04-15',data_pagamento:'2025-04-28',data_agendada:null},
-  ],
-  leads: [
-    {id:1,cliente_nome:'Supermercado Rex',valor_divida:3400,status_pipeline:'D1',prioridade:'QUENTE',ultima_interacao:'2025-04-29',observacoes:'Aguardando retorno do gestor',cobrador_id:3},
-    {id:2,cliente_nome:'Auto Peças Silva',valor_divida:1800,status_pipeline:'D2',prioridade:'RISCO',ultima_interacao:'2025-04-28',observacoes:'Promessa de pagamento semana que vem',cobrador_id:3},
-    {id:3,cliente_nome:'Padaria Central',valor_divida:900,status_pipeline:'NEGOCIACAO',prioridade:'QUENTE',ultima_interacao:'2025-04-30',observacoes:'Proposta parcelamento enviada',cobrador_id:3},
-    {id:4,cliente_nome:'Oficina Mecânica JR',valor_divida:5200,status_pipeline:'J1',prioridade:'RISCO',ultima_interacao:'2025-04-25',observacoes:'Devedor não atende mais',cobrador_id:3},
-    {id:5,cliente_nome:'Moda Feminina SL',valor_divida:750,status_pipeline:'D3',prioridade:'PERDIDO',ultima_interacao:'2025-04-20',observacoes:'Encerramento de negócio',cobrador_id:3},
-    {id:6,cliente_nome:'Restaurante Gourmet',valor_divida:2100,status_pipeline:'D1',prioridade:'QUENTE',ultima_interacao:'2025-04-30',observacoes:'Primeiro contato feito',cobrador_id:5},
-    {id:7,cliente_nome:'Escola de Idiomas',valor_divida:4300,status_pipeline:'J2',prioridade:'RISCO',ultima_interacao:'2025-04-18',observacoes:'Caso em análise jurídica',cobrador_id:5},
-    {id:101,cliente_nome:'Roberto Lima',valor_divida:697,status_pipeline:'NEGOCIACAO',prioridade:'QUENTE',ultima_interacao:'2026-05-01',observacoes:'Cliente pediu para ligar hoje à tarde',cobrador_id:3,followup_data:'2026-05-01',followup_obs:'Ligar às 15h — cliente disse que vai pagar hoje',followup_concluido:false,notas:[{texto:'Movido D2 → Negociação. Follow-up: 01/05/2026',autor:'Admin',data:'2026-05-01T10:00:00'}]},
-    {id:102,cliente_nome:'Fernanda Costa',valor_divida:397,status_pipeline:'NEGOCIACAO',prioridade:'RISCO',ultima_interacao:'2026-04-29',observacoes:'Não atendeu na última ligação',cobrador_id:3,followup_data:'2026-04-28',followup_obs:'Follow-up atrasado — tentar novamente',followup_concluido:false,notas:[{texto:'Movido D3 → Negociação',autor:'Admin',data:'2026-04-28T09:00:00'}]},
-  ],
-  movimentacoes: [
-    {id:1,lead_id:2,status_origem:'D1',status_destino:'D2',data:'2025-04-28T09:15:00',usuario_id:3},
-    {id:2,lead_id:4,status_origem:'D3',status_destino:'J1',data:'2025-04-25T14:30:00',usuario_id:3},
-    {id:3,lead_id:3,status_origem:'D2',status_destino:'NEGOCIACAO',data:'2025-04-29T11:00:00',usuario_id:3},
-  ],
-  pedidos: [
-    {id:1,cliente_nome:'Lucas Almeida',codigo_rastreio:'BR874523100BR',status_entrega:'ENTREGUE',data_envio:'2025-04-20',ultima_atualizacao:'2025-04-25'},
-    {id:2,cliente_nome:'Fernanda Costa',codigo_rastreio:'BR123456789BR',status_entrega:'SAIU',data_envio:'2025-04-28',ultima_atualizacao:'2025-04-30'},
-    {id:3,cliente_nome:'Marcos Vieira',codigo_rastreio:'BR987654321BR',status_entrega:'ENVIADO',data_envio:'2025-04-29',ultima_atualizacao:'2025-04-29'},
-    {id:4,cliente_nome:'Carla Ribeiro',codigo_rastreio:'BR112233445BR',status_entrega:'RETIRAR',data_envio:'2025-04-22',ultima_atualizacao:'2025-04-27'},
-    {id:5,cliente_nome:'Bruno Teixeira',codigo_rastreio:'BR556677889BR',status_entrega:'FALHOU',data_envio:'2025-04-26',ultima_atualizacao:'2025-04-28'},
-  ],
-  clientes_pedidos: [
-    // Vendedor: Carlos Vendas (id:2)
-    {id:10,nome:'Ana Paula Souza',followup_data:'2025-05-01',followup_obs:'Ligar às 14h — confirmar entrega',followup_concluido:false,cpf:'123.456.789-00',email:'ana@email.com',tel:'(27) 99999-1111',cep:'29300-100',rua:'Rua das Flores',numero:'45',bairro:'Centro',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'Entregar pela manhã',vendedor_id:2,produto_nome:'Plano Essencial',plano_nome:'Mensal',plano_preco:97,data:'2025-04-28',pagamento:'PENDENTE',forma_pagamento:null,comprovante:null,notas:[],links:[],suspenso:false},
-    {id:11,nome:'Marcos Antônio Lima',cpf:'987.654.321-00',email:'marcos@email.com',tel:'(27) 98888-2222',cep:'29301-200',rua:'Av. Beira Rio',numero:'200',bairro:'Jardim América',complemento:'Apto 12',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:2,produto_nome:'Plano Essencial',plano_nome:'Trimestral',plano_preco:249,data:'2025-04-29',pagamento:'ANALISE',forma_pagamento:'PIX',comprovante:null,notas:[{texto:'Comprovante PIX enviado para análise',autor:'Carlos Vendas',data:'2025-04-29T10:00:00'}],links:[],suspenso:false},
-    {id:12,nome:'Fernanda Rocha',cpf:'321.654.987-00',email:'fernanda@email.com',tel:'(27) 97777-3333',cep:'29302-300',rua:'Rua das Palmeiras',numero:'88',bairro:'Jardim Itália',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:2,produto_nome:'Curso de Vendas',plano_nome:'Acesso Individual',plano_preco:297,data:'2025-04-27',pagamento:'PAGO',forma_pagamento:'PIX',comprovante:null,notas:[{texto:'Pagamento confirmado via PIX',autor:'Carlos Vendas',data:'2025-04-27T14:00:00'}],links:[],suspenso:false},
-    // Vendedor: Roberto Silva (id:4)
-    {id:13,nome:'Lucas Ferreira',cpf:'456.789.123-00',email:'lucas@email.com',tel:'(27) 96666-4444',cep:'29303-400',rua:'Rua do Comércio',numero:'12',bairro:'Vila Nova',complemento:'Sala 3',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'Ligar antes de entregar',vendedor_id:4,produto_nome:'Plano Essencial',plano_nome:'Anual',plano_preco:797,data:'2025-04-26',pagamento:'PENDENTE',forma_pagamento:null,comprovante:null,notas:[],links:[],suspenso:false},
-    {id:14,nome:'Beatriz Alves',cpf:'789.123.456-00',email:'beatriz@email.com',tel:'(27) 95555-5555',cep:'29304-500',rua:'Av. Brasil',numero:'500',bairro:'Centro',complemento:'Apto 201',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:4,produto_nome:'Curso de Vendas',plano_nome:'Turma (5 pessoas)',plano_preco:997,data:'2025-04-25',pagamento:'PAGO',forma_pagamento:'Boleto',comprovante:null,notas:[{texto:'Boleto compensado',autor:'Roberto Silva',data:'2025-04-26T09:00:00'}],links:[],suspenso:false},
-    // Afiliado: João Afiliado (id:6)
-    {id:15,nome:'Ricardo Nunes',cpf:'147.258.369-00',email:'ricardo@email.com',tel:'(27) 94444-6666',cep:'29305-600',rua:'Rua das Acácias',numero:'77',bairro:'Parque Industrial',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'Contato apenas por WhatsApp',vendedor_id:6,produto_nome:'Plano Essencial',plano_nome:'Mensal',plano_preco:97,data:'2025-04-30',pagamento:'PENDENTE',forma_pagamento:null,comprovante:null,notas:[],links:[],suspenso:false},
-    {id:16,nome:'Juliana Castro',cpf:'258.369.147-00',email:'juliana@email.com',tel:'(27) 93333-7777',cep:'29306-700',rua:'Rua Sete de Setembro',numero:'210',bairro:'Aeroporto',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:6,produto_nome:'Plano Essencial',plano_nome:'Trimestral',plano_preco:249,data:'2025-04-29',pagamento:'ANALISE',forma_pagamento:'PIX',comprovante:null,notas:[{texto:'Comprovante PIX enviado — pago fora da plataforma',autor:'João Afiliado',data:'2025-04-29T16:00:00'}],links:[],suspenso:false},
-    {id:20,nome:'Carlos Eduardo',cpf:'444.555.666-77',email:'carlos.edu@email.com',tel:'(27) 98765-4321',cep:'29300-100',rua:'Rua das Acácias',numero:'99',bairro:'Centro',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:2,produto_nome:'Curso de Vendas',plano_nome:'Acesso Individual',plano_preco:297,data:'2025-04-29',pagamento:'PENDENTE',forma_pagamento:null,comprovante:null,notas:[{texto:'Pedido entregue com sucesso',autor:'Sistema',data:'2025-05-01T10:00:00'}],links:[],suspenso:false},
-    {id:19,nome:'Beatriz Oliveira',cpf:'555.666.777-88',email:'beatriz.o@email.com',tel:'(27) 90000-1111',cep:'29300-100',rua:'Rua dos Andradas',numero:'321',bairro:'Centro',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:2,produto_nome:'Plano Essencial',plano_nome:'Mensal',plano_preco:97,data:'2025-03-10',pagamento:'PENDENTE',forma_pagamento:null,comprovante:null,notas:[],links:[],suspenso:false},
-    {id:18,nome:'Camila Duarte',cpf:'111.222.333-44',email:'camila@email.com',tel:'(27) 91111-2222',cep:'29308-900',rua:'Rua das Orquídeas',numero:'15',bairro:'Jardim Primavera',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'Cliente VIP — indicação direta',vendedor_id:6,produto_nome:'Plano Essencial',plano_nome:'Anual',plano_preco:797,data:'2025-05-01',pagamento:'PENDENTE',forma_pagamento:null,comprovante:null,notas:[{texto:'Cliente pagou fora da plataforma via PIX — aguardando registro pelo Admin',autor:'João Afiliado',data:'2025-05-01T09:30:00'}],links:[],suspenso:false},
-    {id:17,nome:'Thiago Monteiro',cpf:'369.147.258-00',email:'thiago@email.com',tel:'(27) 92222-8888',cep:'29307-800',rua:'Av. Jones dos Santos',numero:'350',bairro:'Centro',complemento:'',cidade:'Cachoeiro de Itapemirim',uf:'ES',obs:'',vendedor_id:6,produto_nome:'Curso de Vendas',plano_nome:'Acesso Individual',plano_preco:297,data:'2025-04-28',pagamento:'PAGO',forma_pagamento:'PIX',comprovante:null,notas:[{texto:'Pagamento registrado pelo Admin — split 30% afiliado / 70% admin',autor:'Admin Geral',data:'2025-04-28T11:00:00'}],links:[],suspenso:false,split_afiliado_pct:30,split_afiliado_val:89.1,split_admin_val:207.9},
-  ],
+  clientes_pedidos: [],
   produtos: [
     {id:20,nome:'Plano Essencial',descricao:'Acesso básico à plataforma',categoria:'Software',status:'ATIVO',estoque_controlado:true,planos:[
       {id:1,nome:'Mensal',quantidade:1,unidade:'mês',preco:97,estoque:50,comissao_afil:20},
@@ -2388,23 +2335,9 @@ let DB = {
     ambiente: 'sandbox',
     logs: []
   },
-  metas: [
-    {vendedor_id:2, mes:'2025-04', meta_valor:20000, meta_pedidos:10},
-    {vendedor_id:4, mes:'2025-04', meta_valor:30000, meta_pedidos:15},
-    {vendedor_id:6, mes:'2025-04', meta_valor:15000, meta_pedidos:8},
-  ],
-  notificacoes: [
-    {id:1, tipo:'pagamento', titulo:'Pagamento aprovado', msg:'Marcos Lima — R$ 249,00 aprovado', data:'2025-05-01T10:00:00', lida:false, page:'clientes-pedidos'},
-    {id:2, tipo:'comprovante', titulo:'Comprovante recebido', msg:'Juliana Castro enviou comprovante PIX', data:'2025-05-01T09:30:00', lida:false, page:'aprovacoes'},
-    {id:3, tipo:'lead', titulo:'Novo lead no D1', msg:'Sandro Pereira entrou no pipeline automaticamente', data:'2025-05-01T08:15:00', lida:false, page:'kanban'},
-    {id:4, tipo:'venda', titulo:'Nova venda agendada', msg:'Pedro Santos — R$ 3.200,00 agendado para 02/05', data:'2025-04-30T16:00:00', lida:true, page:'vendas'},
-    {id:5, tipo:'estoque', titulo:'Estoque baixo', msg:'Curso de Vendas — Turma: apenas 8 unidades', data:'2025-04-30T12:00:00', lida:true, page:'produtos'},
-  ],
-  contato_logs: [
-    {id:1, lead_id:2, canal:'WhatsApp', resultado:'Não atendeu', obs:'Número correto, tentativa às 14h', autor:'Ana Cobrança', data:'2025-04-28T14:00:00'},
-    {id:2, lead_id:2, canal:'Telefone', resultado:'Prometeu pagar', obs:'Disse que paga na sexta', autor:'Ana Cobrança', data:'2025-04-29T10:30:00'},
-    {id:3, lead_id:4, canal:'WhatsApp', resultado:'Número inválido', obs:'Número desativado', autor:'Ana Cobrança', data:'2025-04-25T09:00:00'},
-  ],
+  metas: [],
+  notificacoes: [],
+  contato_logs: [],
   config: {
     empresa_nome: 'WhaleFlow Ltda',
     empresa_cnpj: '00.000.000/0001-00',
@@ -2417,11 +2350,15 @@ let DB = {
     notif_lead: true,
     notif_estoque: true,
   },
-  frustracoes: [
-    {id:1, tipo:'DEVOLUCAO', pedido_nome:'Lucas Ferreira', vendedor_id:4, valor:797, motivo:'Cliente arrependeu após entrega', data:'2025-04-28', status:'PENDENTE', obs:'Produto devolvido pela transportadora'},
-    {id:2, tipo:'CANCELAMENTO', pedido_nome:'Ana Paula Souza', vendedor_id:2, valor:97, motivo:'Endereço incorreto', data:'2025-04-27', status:'RESOLVIDO', obs:'Reembolso feito via PIX'},
-    {id:3, tipo:'ROUBO', pedido_nome:'Marcos Lima', vendedor_id:2, valor:249, motivo:'Encomenda roubada durante entrega', data:'2025-04-25', status:'INVESTIGANDO', obs:'Registro de BO efetuado'},
-  ],
+  frustracoes: [],
+  leads: [],
+  vendas: [],
+  movimentacoes: [],
+  taxas: [],
+  integracoes: { webhooks: [], pagamento: [
+    {id:1,nome:'Banco Cora',sub:'Pagamentos e Cobranças',funcionalidade:'Geração de boletos diretamente nos detalhes do pedido.',config:'Via variável de ambiente (CORA_API_KEY)',ativo:true,icon:'🏦',cor:'#4f7cff'},
+    {id:2,nome:'Payt',sub:'Checkout de Pagamento',funcionalidade:'Link de checkout com dados do cliente preenchidos automaticamente.',config:'Payt Checkout ID no cadastro de cada plano',ativo:true,icon:'💜',cor:'#a78bfa'},
+  ], outras: [], custom: [] },
   nextId: 100
 };
 
