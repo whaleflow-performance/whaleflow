@@ -3758,18 +3758,30 @@ async function saveUsuario(){
 
   const btn = document.querySelector('#modalUsuario .btn-primary');
   if(btn){ btn.textContent='Salvando...'; btn.disabled=true; }
+  try {
 
   // Try API first
-  const result = await api.post('/api/usuarios', {nome, email, senha, tipo, vendedores: vendedoresSel, cobradores:[], comissao_pct:30});
-
-  if(result && result.id){
-    // Saved in DB - add to local
-    DB.users.push({...result, senha:'***'});
+  const newUser = {id:DB.nextId++, nome, email, senha, tipo, vendedores:vendedoresSel, cobradores:[], comissao_pct:30};
+  
+  if(typeof api !== 'undefined' && authToken){
+    try {
+      const result = await api.post('/api/usuarios', newUser);
+      if(result && result.id){
+        DB.users.push({...result, senha:'***'});
+      } else {
+        DB.users.push(newUser);
+      }
+    } catch(e) {
+      DB.users.push(newUser);
+    }
   } else {
-    // Fallback - save locally only
-    DB.users.push({id:DB.nextId++, nome, email, senha, tipo, vendedores:vendedoresSel, cobradores:[], comissao_pct:30});
+    DB.users.push(newUser);
   }
 
+  } catch(e) {
+    console.error('Erro ao salvar:', e);
+  }
+  if(btn){ btn.textContent='Criar Usuário'; btn.disabled=false; }
   closeModal('modalUsuario');
   renderEquipe();
 }
