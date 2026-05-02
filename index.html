@@ -3345,7 +3345,7 @@ function toggleVendedorSelect(){
 function saveUsuario(){
   const tipo=document.getElementById('u_tipo').value;
   const vendedoresSel=tipo==='COBRADOR'?Array.from(document.querySelectorAll('#vendedoresCheckboxes input:checked')).map(c=>parseInt(c.value)):[];
-  const comissaoPct=tipo==='AFILIADO'?parseInt(30)||30:null;
+  const comissaoPct=null;
   const u={id:DB.nextId++,nome:document.getElementById('u_nome').value,email:document.getElementById('u_email').value,senha:document.getElementById('u_senha').value,tipo,vendedores:vendedoresSel,cobradores:[],comissao_pct:comissaoPct};
   DB.users.push(u);
   closeModal('modalUsuario');
@@ -8116,10 +8116,7 @@ function renderEquipe(){
             <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Cobradores</div>
             <div style="font-size:16px;font-weight:700;color:#e879f9">${(u.cobradores||[]).length}</div>
           </div>
-          <div style="background:var(--bg3);border-radius:var(--radius);padding:8px 10px">
-            <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Comissão</div>
-            <div style="font-size:16px;font-weight:700;color:#e879f9">${u.comissao_pct||0}%</div>
-          </div>`:''}
+  `:''}
       </div>
 
       <!-- Vinculados -->
