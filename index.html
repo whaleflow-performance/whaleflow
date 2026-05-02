@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('appWrap').style.cssText = 'display:flex;width:100%';
         setupSidebar();
         navigateDefault();
-        setTimeout(()=>{ fullSync(); }, 500);
+        setTimeout(()=>{ fullSync(); startPolling(); }, 500);
         return;
       } else {
         // Token expired - clear and show login
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('appWrap').style.display='flex';
         setupSidebar();
         navigateDefault();
-        setTimeout(()=>{ fullSync(); }, 500);
+        setTimeout(()=>{ fullSync(); startPolling(); }, 500);
       } else {
         // Fallback to local login
         handleLogin();
@@ -164,6 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function logout() {
+  stopPolling();
   authToken = null;
   localStorage.removeItem('wf_token');
   localStorage.removeItem('wf_user');
@@ -252,6 +253,58 @@ async function fullSync() {
 }
 
 // ===== END SYNC FUNCTIONS =====
+
+
+// ===== AUTO SYNC (polling a cada 30s) =====
+let _pollInterval = null;
+
+function startPolling(){
+  if(_pollInterval) return;
+  _pollInterval = setInterval(async ()=>{
+    if(!authToken) { stopPolling(); return; }
+    // Sync silently based on active page
+    const active = document.querySelector('.page.active');
+    if(!active) return;
+    const pageId = active.id.replace('page-','');
+
+    if(['clientes-pedidos','detalhe-pedido','aprovacoes'].includes(pageId)){
+      const data = await api.get('/api/pedidos');
+      if(data && Array.isArray(data)){
+        // Merge - add new ones from server
+        data.forEach(p=>{
+          if(!DB.clientes_pedidos.find(x=>x.id===p.id)){
+            DB.clientes_pedidos.push({...p, notas:p.notas||[], links:p.links||[], suspenso:p.suspenso||false});
+          }
+        });
+        if(pageId==='clientes-pedidos') renderClientesPedidos();
+        if(pageId==='aprovacoes') renderAprovacoes();
+      }
+    }
+
+    if(['kanban','followup-leads'].includes(pageId)){
+      const data = await api.get('/api/leads');
+      if(data && Array.isArray(data)){
+        data.forEach(l=>{
+          const existing = DB.leads.find(x=>x.id===l.id);
+          if(!existing) DB.leads.push({...l, notas:l.notas||[]});
+          else if(existing.status_pipeline !== l.status_pipeline){
+            existing.status_pipeline = l.status_pipeline;
+          }
+        });
+        if(pageId==='kanban') renderKanban();
+        if(pageId==='followup-leads') renderFollowupLeads();
+      }
+    }
+
+    if(pageId==='dashboard') renderAdminDash();
+
+  }, 30000); // 30 segundos
+}
+
+function stopPolling(){
+  if(_pollInterval){ clearInterval(_pollInterval); _pollInterval=null; }
+}
+// ===== END AUTO SYNC =====
 
 // ===== END API INTEGRATION =====
 
@@ -3785,7 +3838,7 @@ function setPedPage(n){
   window._pedPage=n;
   renderClientesPedidos();
 }
-function saveClientePedido(){
+async function saveClientePedido(){
   const prodId=parseInt(document.getElementById('cp_produto').value)||null;
   const planoId=parseInt(document.getElementById('cp_plano').value)||null;
   const prod=prodId?DB.produtos.find(x=>x.id===prodId):null;
@@ -3807,10 +3860,9 @@ function saveClientePedido(){
     cidade:document.getElementById('cp_cidade').value,
     uf:document.getElementById('cp_uf').value,
     obs:document.getElementById('cp_obs').value,
-    forma_pagamento_inicial: (document.querySelector('input[name="cp_forma_pgto"]:checked')?.value)||null,
-    anexos: cpFiles.map(f=>({nome:f.name,tipo:f.type,size:f.size})),
+    forma_pagamento_inicial:(document.querySelector('input[name="cp_forma_pgto"]:checked')?.value)||null,
+    anexos:cpFiles.map(f=>({nome:f.name,tipo:f.type,size:f.size})),
     vendedor_id:currentUser.id,
-    cobrador_auto_id: currentUser.tipo==='AFILIADO' ? (getCobradorParaNovoPedido(currentUser.id)||{}).id||null : null,
     data:new Date().toISOString().split('T')[0],
     pagamento:'PENDENTE',
     forma_pagamento:null,
@@ -3821,12 +3873,26 @@ function saveClientePedido(){
   };
   DB.clientes_pedidos.push(p);
   debitarEstoque(p);
+
+  // Save to API
+  if(authToken){
+    const result = await api.post('/api/pedidos', p);
+    if(result && result.id){
+      p._dbId = result.id;
+      p.id = result.id;
+    }
+  }
+
   cpFiles=[];
   closeModal('modalClientePedido');
   document.getElementById('modalClientePedido').querySelectorAll('input,select,textarea').forEach(el=>el.value='');
   renderClientesPedidos();
 }
-function deleteClientePedido(id){DB.clientes_pedidos=DB.clientes_pedidos.filter(p=>p.id!==id);renderClientesPedidos();}
+async function deleteClientePedido(id){
+  DB.clientes_pedidos=DB.clientes_pedidos.filter(p=>p.id!==id);
+  renderClientesPedidos();
+  if(authToken) await api.delete('/api/pedidos?id='+id);
+}
 function maskCPF(el){let v=el.value.replace(/\D/g,'');if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2');el.value=v;}
 function maskTel(el){let v=el.value.replace(/\D/g,'');if(v.length>10)v=v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3');else if(v.length>6)v=v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3');else if(v.length>2)v=v.replace(/(\d{2})(\d*)/,'($1) $2');el.value=v;}
 function maskCEP(el){
@@ -6566,7 +6632,7 @@ function renderFrustracoes(){
   }).join('');
 }
 
-function saveFrustracao(){
+async function saveFrustracao(){
   const f = {
     id: DB.nextId++,
     tipo: document.getElementById('fr_tipo').value,
@@ -6579,14 +6645,19 @@ function saveFrustracao(){
     data: new Date().toISOString().split('T')[0],
   };
   DB.frustracoes.push(f);
+  if(authToken){
+    const result = await api.post('/api/frustracoes', f);
+    if(result && result.id) f.id = result.id;
+  }
   closeModal('modalFrustracao');
   ['fr_pedido','fr_valor','fr_motivo','fr_obs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   renderFrustracoes();
 }
 
-function deleteFrustracao(id){
+async function deleteFrustracao(id){
   DB.frustracoes = DB.frustracoes.filter(f=>f.id!==id);
   renderFrustracoes();
+  if(authToken) await api.delete('/api/frustracoes?id='+id);
 }
 
 function alterarStatusFrustr(id){
@@ -6599,7 +6670,7 @@ function alterarStatusFrustr(id){
 }
 
 
-function marcarStatusPedido(status){
+async function marcarStatusPedido(status){
   const p = DB.clientes_pedidos.find(x=>x.id===pedidoAtivoId);
   if(!p) return;
   const labels={DEVOLVIDO:'Devolvido',CANCELADO:'Cancelado',ROUBADO:'Roubado',PENDENTE:'Pendente'};
@@ -6626,6 +6697,7 @@ function marcarStatusPedido(status){
   renderNotasPedido(p);
   renderAdminApproveBar(p);
   renderClientesPedidos();
+  if(authToken) await api.put('/api/pedidos', p);
 }
 
 
@@ -7687,7 +7759,7 @@ function openModalPagarPedido(pedidoId){
   openModal('modalPagarPedido');
 }
 
-function confirmarPagamentoPedido(){
+async function confirmarPagamentoPedido(){
   const pedidoId = parseInt(document.getElementById('mp_pedido_id').value);
   const forma = document.getElementById('mp_forma_selected').value;
   const valor = parseFloat(document.getElementById('mp_valor').value)||0;
@@ -7707,6 +7779,7 @@ function confirmarPagamentoPedido(){
   document.querySelectorAll('.ped-expand-row').forEach(r=>r.remove());
   expandedPedidoId=null;
   renderClientesPedidos();
+  if(authToken) await api.put('/api/pedidos', p);
 }
 
 function selecionarFormaPagamento(forma){
@@ -7840,7 +7913,7 @@ function moverLeadParaEtapa(etapa){
   closeKbSidePanel();
 }
 
-function salvarNotaLead(){
+async function salvarNotaLead(){
   if(!kbActiveLead) return;
   const lead = DB.leads.find(l=>l.id===kbActiveLead);
   const input = document.getElementById('kbsp_nota_input');
@@ -7848,9 +7921,9 @@ function salvarNotaLead(){
   if(!lead.notas) lead.notas=[];
   lead.notas.unshift({texto:input.value.trim(),autor:currentUser.nome,data:new Date().toISOString()});
   input.value='';
-  // Refresh timeline
   const tlEl=document.getElementById('kbsp_timeline');
-  tlEl.innerHTML=lead.notas.map(n=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);color:var(--text2)">${n.texto}<span style="color:var(--text3)"> — ${n.autor}</span></div>`).join('');
+  if(tlEl) tlEl.innerHTML=lead.notas.map(n=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);color:var(--text2)">${n.texto}<span style="color:var(--text3)"> — ${n.autor}</span></div>`).join('');
+  if(authToken) await api.put('/api/leads', lead);
 }
 
 function abrirWhatsAppLead(){
@@ -8415,7 +8488,7 @@ async function handleLoginBtn(){
       document.getElementById('appWrap').style.display='flex';
       setupSidebar();
       navigateDefault();
-      setTimeout(()=>{ fullSync(); }, 500);
+      setTimeout(()=>{ fullSync(); startPolling(); }, 500);
       return;
     }
     // API returned error
