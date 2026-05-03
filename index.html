@@ -7893,7 +7893,7 @@ function togglePedidoExpand(id, rowEl){
         <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirModalBoleto()">📄 Gerar Boleto</button>
         <button class="ped-expand-action-btn blue" onclick="event.stopPropagation()">🔗 Link PayT</button>
         <button class="ped-expand-action-btn" onclick="event.stopPropagation();abrirPedido(${p.id})">✎ Editar</button>
-        <button class="ped-expand-action-btn red" onclick="event.stopPropagation();deleteClientePedido(${p.id})">🗑 Excluir</button>
+        <button class="ped-expand-action-btn red" onclick="event.stopPropagation();confirmarExcluirPedido(${p.id},this.dataset.nome)" data-nome="${p.nome.replace(/"/g,'&quot;')}">🗑 Excluir</button>
       </div>
       <!-- Body -->
       <div class="ped-expand-inner">
@@ -9078,6 +9078,20 @@ function addPlanoRow(){
   container.appendChild(row);
 }
 
+
+function confirmarExcluirPedido(id, nome_or_el){
+  const nome = typeof nome_or_el==='string' ? nome_or_el : (nome_or_el?.dataset?.nome||'—');
+  document.getElementById('excluir_pedido_id').value = id;
+  document.getElementById('excluir_pedido_nome').textContent = nome;
+  openModal('modalExcluirPedido');
+}
+
+async function executarExcluirPedido(){
+  const id = parseInt(document.getElementById('excluir_pedido_id').value);
+  closeModal('modalExcluirPedido');
+  await deleteClientePedido(id);
+}
+
 // ===== MODALS =====
 function openModal(id){
   document.getElementById(id).classList.add('open');
@@ -10227,6 +10241,32 @@ document.getElementById('appWrap').style.display='none';
       <span>ESC fechar</span>
     </div>
   </div>
+</div>
+
+<!-- MODAL: CONFIRMAR EXCLUIR PEDIDO -->
+<div class="modal-overlay" id="modalExcluirPedido">
+<div class="modal" style="width:400px">
+  <div class="modal-title">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:30px;height:30px;border-radius:50%;background:var(--red-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </div>
+      Excluir Pedido
+    </div>
+    <button class="modal-close" onclick="closeModal('modalExcluirPedido')">×</button>
+  </div>
+  <input type="hidden" id="excluir_pedido_id">
+  <div style="font-size:13px;color:var(--text2);margin-bottom:6px">
+    Tem certeza que deseja excluir o pedido de <strong id="excluir_pedido_nome" style="color:var(--text)">—</strong>?
+  </div>
+  <div style="font-size:12px;color:var(--text3);background:var(--red-bg);border:1px solid rgba(245,101,101,.2);border-radius:var(--radius);padding:10px 12px;margin-bottom:16px">
+    ⚠️ Esta ação não pode ser desfeita.
+  </div>
+  <div style="display:flex;gap:10px;justify-content:flex-end">
+    <button class="btn btn-ghost" onclick="closeModal('modalExcluirPedido')">Cancelar</button>
+    <button class="btn" style="background:var(--red);color:#fff;border-color:var(--red);border-radius:6px" onclick="executarExcluirPedido()">Excluir</button>
+  </div>
+</div>
 </div>
 </body>
 </html>
