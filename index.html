@@ -2395,6 +2395,7 @@ async function syncProdutos() {
           comissao_afil: pl.comissao_afil ? parseFloat(pl.comissao_afil) : null,
           custo_produto: pl.custo_produto ? parseFloat(pl.custo_produto) : null,
           frete: pl.frete ? parseFloat(pl.frete) : null,
+          payt_checkout_id: pl.payt_checkout_id || null,
         }))
       }));
     } else {
