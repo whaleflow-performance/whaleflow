@@ -4696,12 +4696,23 @@ function testarWebhook(id){
   }, 1200);
 }
 
-function dispararWebhook(evento, payload){
-  const wh = DB.webhooks.find(w=>w.evento===evento && w.ativo && w.url);
-  if(!wh) return;
-  const meta = whEventMeta[evento]||{};
-  wh.logs.unshift({status:200, data: new Date().toISOString(), resumo: payload});
-  if(document.getElementById('page-webhooks').classList.contains('active')) renderWebhooks();
+async function dispararWebhook(evento, payload){
+  const whs = DB.webhooks.filter(w=>w.evento===evento && w.ativo && w.url);
+  if(!whs.length) return;
+  for(const wh of whs){
+    try {
+      const r = await fetch(wh.url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({evento, payload, data: new Date().toISOString()})
+      });
+      wh.logs.unshift({status: r.status, data: new Date().toISOString(), resumo: payload});
+    } catch(e) {
+      wh.logs.unshift({status: 500, data: new Date().toISOString(), resumo: 'Erro: '+e.message});
+    }
+    if(wh.logs.length > 20) wh.logs = wh.logs.slice(0,20);
+    if(document.getElementById('page-webhooks')?.classList.contains('active')) renderWebhooks();
+  }
 }
 
 function renderLogGlobal(){
