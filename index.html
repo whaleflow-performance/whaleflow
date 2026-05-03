@@ -8649,12 +8649,28 @@ function editarUsuario(id){
   const btn = document.querySelector('#modalUsuario .btn-primary');
   if(btn){
     btn.textContent = 'Atualizar';
-    btn.onclick = ()=>{
+    btn.onclick = async ()=>{
       u.nome  = document.getElementById('u_nome').value;
       u.email = document.getElementById('u_email').value;
       u.tipo  = document.getElementById('u_tipo').value;
-      if(document.getElementById('u_senha').value) u.senha = document.getElementById('u_senha').value;
+      const novaSenha = document.getElementById('u_senha').value;
+      if(novaSenha) u.senha = novaSenha;
       u.vendedores = [...document.querySelectorAll('#vendedoresCheckboxes input:checked')].map(c=>parseInt(c.value));
+
+      // Save to API
+      const token = authToken || localStorage.getItem('wf_token');
+      if(token){
+        try {
+          const payload = {id:u.id, nome:u.nome, email:u.email, tipo:u.tipo, vendedores:u.vendedores, cobradores:u.cobradores||[]};
+          if(novaSenha) payload.senha = novaSenha;
+          await fetch('/api/usuarios', {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+            body: JSON.stringify(payload)
+          });
+        } catch(e){ console.error('Erro ao atualizar usuário:', e); }
+      }
+
       closeModal('modalUsuario');
       btn.textContent='Criar Usuário'; btn.onclick=saveUsuario;
       renderEquipe();
