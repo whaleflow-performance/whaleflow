@@ -7543,13 +7543,14 @@ function renderPlanos(){
     </tr>`).join('');
 }
 
-function salvarNovoPlano(){
+async function salvarNovoPlano(){
   const prodId = parseInt(document.getElementById('np_produto').value);
   const pr = DB.produtos.find(p=>p.id===prodId);
   if(!pr){ alert('Selecione um produto'); return; }
   const nome = document.getElementById('np_nome').value.trim();
   if(!nome){ alert('Informe o nome do plano'); return; }
-  pr.planos.push({
+
+  const plano = {
     id: DB.nextId++,
     nome,
     preco: parseFloat(document.getElementById('np_preco').value)||0,
@@ -7557,7 +7558,23 @@ function salvarNovoPlano(){
     frete: parseFloat(document.getElementById('np_frete').value)||null,
     quantidade:1, unidade:'un', estoque:null, comissao_afil:null,
     inativo: document.getElementById('np_status').value==='inativo',
-  });
+  };
+  pr.planos.push(plano);
+
+  // Save to API
+  const token = authToken || localStorage.getItem('wf_token');
+  if(token){
+    try {
+      const r = await fetch('/api/produtos', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({tipo:'plano', produto_id: prodId, nome: plano.nome, preco: plano.preco, custo_produto: plano.custo_produto, frete: plano.frete, quantidade:1, unidade:'un', inativo: plano.inativo||false})
+      });
+      const data = await r.json();
+      if(data && data.id) plano.id = data.id;
+    } catch(e){ console.error('Erro ao salvar plano:', e); }
+  }
+
   closeModal('modalNovoPlano');
   renderPlanos();
 }
