@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const users = await sql`
-        SELECT id, nome, email, tipo, vendedores, cobradores, comissao_pct, created_at 
+        SELECT id, nome, email, tipo, vendedores, cobradores, comissao_pct, created_at
         FROM usuarios ORDER BY nome`;
       return res.status(200).json(users);
     }
@@ -50,19 +50,19 @@ export default async function handler(req, res) {
       if (u.senha) {
         const hash = await bcrypt.hash(u.senha, 10);
         await sql`
-          UPDATE usuarios SET 
-            nome = ${u.nome}, 
-            email = ${u.email}, 
-            senha = ${hash}, 
+          UPDATE usuarios SET
+            nome = ${u.nome},
+            email = ${u.email},
+            senha = ${hash},
             tipo = ${u.tipo},
             vendedores = ${JSON.stringify(u.vendedores || [])}::jsonb,
             cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb
           WHERE id = ${u.id}`;
       } else {
         await sql`
-          UPDATE usuarios SET 
-            nome = ${u.nome}, 
-            email = ${u.email}, 
+          UPDATE usuarios SET
+            nome = ${u.nome},
+            email = ${u.email},
             tipo = ${u.tipo},
             vendedores = ${JSON.stringify(u.vendedores || [])}::jsonb,
             cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb
