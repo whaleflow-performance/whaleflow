@@ -2505,6 +2505,7 @@ function stopPolling(){
 
 // Sync rastreamento
 async function syncRastreamento() {
+  if(!Array.isArray(DB.pedidos)) DB.pedidos = [];
   try {
     const data = await api.get('/api/rastreamento');
     if(data && Array.isArray(data)) {
@@ -2568,7 +2569,7 @@ adicionarNotaExpand = async function(pedidoId) {
 const _origSavePedido = savePedido;
 savePedido = async function() {
   _origSavePedido();
-  const last = DB.pedidos[DB.pedidos.length - 1];
+  const last = DB.pedidos[(DB.pedidos||[]).length - 1];
   if(last && authToken) {
     const result = await api.post('/api/rastreamento', last);
     if(result && result.id) last.id = result.id;
@@ -3578,7 +3579,7 @@ function renderRastreamento(){
 }
 function setTrackTab(id,el){activeTrackingTab=id;renderRastreamento();}
 function renderPedidos(){
-  let pedidos=activeTrackingTab==='TODOS'?DB.pedidos:DB.pedidos.filter(p=>p.status_entrega===activeTrackingTab);
+  let pedidos=activeTrackingTab==='TODOS'?DB.pedidos:(DB.pedidos||[]).filter(p=>p.status_entrega===activeTrackingTab);
   const de=document.getElementById('rastr_data_de')?.value;
   const ate=document.getElementById('rastr_data_ate')?.value;
   if(de) pedidos=pedidos.filter(p=>p.ultima_atualizacao>=de);
@@ -3613,7 +3614,7 @@ function savePedido(){
   closeModal('modalPedido');
   renderRastreamento();
 }
-function deletePedido(id){DB.pedidos=DB.pedidos.filter(p=>p.id!==id);renderPedidos();}
+function deletePedido(id){DB.pedidos=(DB.pedidos||[]).filter(p=>p.id!==id);renderPedidos();}
 
 // ===== EQUIPE =====
 function renderEquipe(){
@@ -3892,7 +3893,7 @@ function renderClientesPedidos(){
   statusDefs.slice(1).forEach(s=>{
     if(['ENVIADO','SAIU','RETIRAR','ENTREGUE'].includes(s.key)){
       // Cross-reference rastreamento
-      const names = DB.pedidos.filter(r=>r.status_entrega===s.key).map(r=>r.cliente_nome);
+      const names = (DB.pedidos||[]).filter(r=>r.status_entrega===s.key).map(r=>r.cliente_nome);
       countMap[s.key] = base.filter(p=>names.includes(p.nome)).length;
     } else {
       countMap[s.key] = base.filter(p=>p.pagamento===s.key).length;
@@ -3916,7 +3917,7 @@ function renderClientesPedidos(){
   let filtered = base;
   if(activeTab!=='TODOS'){
     if(['ENVIADO','SAIU','RETIRAR','ENTREGUE'].includes(activeTab)){
-      const names=DB.pedidos.filter(r=>r.status_entrega===activeTab).map(r=>r.cliente_nome);
+      const names=(DB.pedidos||[]).filter(r=>r.status_entrega===activeTab).map(r=>r.cliente_nome);
       filtered=base.filter(p=>names.includes(p.nome));
     } else {
       filtered=base.filter(p=>p.pagamento===activeTab);
@@ -3970,7 +3971,7 @@ function renderClientesPedidos(){
 
   tbody.innerHTML=paginated.map((p,idx)=>{
     const num = filtered.length - ((page-1)*perPage) - idx;
-    const rastreio=DB.pedidos.find(r=>r.cliente_nome===p.nome);
+    const rastreio=(DB.pedidos||[]).find(r=>r.cliente_nome===p.nome);
     const rastreioCode=rastreio?rastreio.codigo_rastreio:'—';
     const etapa=rastreio?({ENVIADO:'Enviado',SAIU:'Saiu Entrega',ENTREGUE:'Entregue',RETIRAR:'Retirar',FALHOU:'Falhou'})[rastreio.status_entrega]||'—':'—';
     const sc = statusCor[p.pagamento]||'#1e1e1e;color:#888';
@@ -5462,7 +5463,7 @@ function verComprovantePedido(id){
 
 
 function atualizarStatusRastreio(pedidoId, novoStatus){
-  const p = DB.pedidos.find(x=>x.id===pedidoId);
+  const p = (DB.pedidos||[]).find(x=>x.id===pedidoId);
   if(!p) return;
   const statusAnterior = p.status_entrega;
   p.status_entrega = novoStatus;
@@ -6927,7 +6928,7 @@ function verificarPedidosRoubados(){
     if(p.pagamento === 'ROUBADO' || p.pagamento === 'DEVOLVIDO' || p.pagamento === 'CANCELADO' || p.pagamento === 'PAGO') return;
 
     // Find linked rastreio pedido
-    const rastreio = DB.pedidos.find(r => r.cliente_nome === p.nome || r.id === p.pedido_rastreio_id);
+    const rastreio = (DB.pedidos||[]).find(r => r.cliente_nome === p.nome || r.id === p.pedido_rastreio_id);
     if(!rastreio || rastreio.status_entrega !== 'ENTREGUE') return;
 
     // Check days since last update
@@ -7844,7 +7845,7 @@ function togglePedidoExpand(id, rowEl){
   if(!p.links) p.links=[];
 
   const vend = DB.users.find(u=>u.id===p.vendedor_id);
-  const rastreio = DB.pedidos.find(r=>r.cliente_nome===p.nome);
+  const rastreio = (DB.pedidos||[]).find(r=>r.cliente_nome===p.nome);
   const blvCode = 'BLV-'+Math.random().toString(36).slice(2,10).toUpperCase();
 
   const statusCor = {PAGO:'var(--green)',PENDENTE:'var(--amber)',ANALISE:'var(--blue)',REJEITADO:'var(--red)',DEVOLVIDO:'#fb923c',CANCELADO:'var(--text3)',ROUBADO:'#e879f9'};
@@ -8088,7 +8089,7 @@ function openKbSidePanel(leadId){
   document.getElementById('kbsp_plano').textContent    = ped?.plano_nome||'—';
   document.getElementById('kbsp_valor').textContent    = lead.valor_divida ? fmt(lead.valor_divida) : '—';
   document.getElementById('kbsp_dias').textContent     = diasAtras+'d';
-  const rastreio = DB.pedidos.find(r=>r.cliente_nome===lead.cliente_nome);
+  const rastreio = (DB.pedidos||[]).find(r=>r.cliente_nome===lead.cliente_nome);
   document.getElementById('kbsp_rastreio').textContent = rastreio?.codigo_rastreio||'—';
   document.getElementById('kbsp_codigo').textContent   = ped ? 'BLV-'+String(ped.id).padStart(8,'0') : '—';
 
@@ -9079,7 +9080,7 @@ function openModal(id){
     if(p){
       document.getElementById('susp_nome_cliente').textContent = p.nome;
       // Try to find a rastreio for this client
-      const ped = DB.pedidos.find(x=>x.cliente_nome===p.nome);
+      const ped = (DB.pedidos||[]).find(x=>x.cliente_nome===p.nome);
       document.getElementById('susp_rastreio').textContent = ped ? 'Rastreio: '+ped.codigo_rastreio : 'Sem rastreio vinculado';
       document.getElementById('susp_valor').textContent = p.plano_preco ? fmt(p.plano_preco) : '—';
       document.getElementById('susp_produto').textContent = p.produto_nome || '—';
