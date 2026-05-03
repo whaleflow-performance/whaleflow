@@ -27,6 +27,19 @@
   --shadow:0 1px 3px rgba(0,0,0,.4);
   --shadow-lg:0 4px 20px rgba(0,0,0,.5);
 }
+[data-theme="light"]{
+  --bg:#f0f2f8;--bg2:#ffffff;--bg3:#f5f6fa;--bg4:#e8eaf2;
+  --border:#dde0ee;--border2:#c8cce0;
+  --text:#1a1d2e;--text2:#4a5070;--text3:#8890b0;
+  --blue:#3a6bef;--blue2:#2a5ae0;--blue-bg:#e8edff;
+  --green:#28b878;--green-bg:#e0f7ed;
+  --amber:#d4890a;--amber-bg:#fff3d6;
+  --red:#e04545;--red-bg:#fde8e8;
+  --purple:#7c6bea;--purple-bg:#ede9ff;
+  --cyan:#0cb8d4;--cyan-bg:#e0f8fc;
+  --shadow:0 1px 3px rgba(0,0,0,.1);
+  --shadow-lg:0 4px 20px rgba(0,0,0,.12);
+}
 html{font-size:14px;font-family:var(--font-main)}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex}
 .sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:.3s}
@@ -317,6 +330,83 @@ select option{background:var(--bg2)}
 .kb-sp-action-btn.amber{background:var(--amber-bg);color:var(--amber);border-color:rgba(245,166,35,.3)}
 
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.busca-item:hover{background:var(--bg3)}
+
+/* ===== MOBILE RESPONSIVO ===== */
+@media (max-width: 768px) {
+  body { flex-direction: column; }
+
+  /* Sidebar vira menu hamburguer */
+  .sidebar {
+    position: fixed;
+    left: -220px;
+    top: 0;
+    height: 100vh;
+    z-index: 200;
+    transition: left .25s cubic-bezier(.4,0,.2,1);
+  }
+  .sidebar.mobile-open { left: 0; }
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 199;
+  }
+  .sidebar-overlay.open { display: block; }
+
+  /* Main area ocupa tudo */
+  .main { width: 100%; min-width: 0; }
+
+  /* Topbar mobile */
+  .topbar {
+    padding: 10px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-title { font-size: 14px; }
+
+  /* Hamburguer button */
+  #mobile_menu_btn { display: flex !important; }
+
+  /* Content padding menor */
+  .content { padding: 12px; }
+
+  /* Cards em coluna */
+  .kpi-grid { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
+
+  /* Tabelas com scroll horizontal */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Kanban scroll horizontal */
+  #kanbanBoard { overflow-x: auto; flex-wrap: nowrap !important; }
+  .kanban-col { min-width: 260px; }
+
+  /* Modais full screen em mobile */
+  .modal { width: 95vw !important; max-height: 90vh; overflow-y: auto; margin: 0; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+
+  /* Side panel full width */
+  .kb-side-panel { width: 100vw !important; }
+
+  /* Grid usuarios em 1 coluna */
+  #eq_grid { grid-template-columns: 1fr !important; }
+
+  /* Esconder labels longos */
+  .topbar .filter-bar { display: none; }
+
+  /* Busca global full width */
+  #busca_overlay { padding-top: 20px; align-items: flex-start; }
+  #busca_overlay > div { width: 100% !important; max-width: 100% !important; border-radius: var(--radius) var(--radius) 0 0; }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  .content { padding: 8px; }
+}
+/* ===== END MOBILE ===== */
+
 /* Responsive */
 @media(max-width:900px){
   .charts-row{grid-template-columns:1fr}
@@ -367,6 +457,7 @@ select option{background:var(--bg2)}
 </div>
 
 <!-- APP -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileMenu()"></div>
 <div id="appWrap" style="display:none;width:100%">
 
 <!-- SIDEBAR -->
@@ -398,6 +489,7 @@ select option{background:var(--bg2)}
 <!-- MAIN -->
 <div class="main" id="mainArea">
 <div class="topbar">
+  <button id="mobile_menu_btn" onclick="toggleMobileMenu()" style="display:none;background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;margin-right:8px;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
   <div class="topbar-title" id="topbarTitle">Dashboard</div>
   <div class="filter-bar" id="filterBar">
     <button class="filter-btn active" onclick="setFilter(this,'hoje')">Hoje</button>
@@ -405,6 +497,13 @@ select option{background:var(--bg2)}
     <button class="filter-btn" onclick="setFilter(this,'7dias')">7 dias</button>
     <button class="filter-btn" onclick="setFilter(this,'personalizado')">Personalizado</button>
   </div>
+  <button onclick="openBuscaGlobal()" title="Busca global (Ctrl+K)" id="search_btn" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:6px;border-radius:6px;display:flex;align-items:center;gap:5px;transition:.15s" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='none'">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <span style="font-size:11px;color:var(--text3)">Ctrl+K</span>
+  </button>
+  <button onclick="toggleTheme()" id="theme_btn" title="Alternar tema" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:6px;border-radius:6px;display:flex;align-items:center;transition:.15s" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='none'">
+    <svg id="theme_icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
   <button onclick="refreshCurrentPage()" title="Atualizar dados" id="refresh_btn" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:6px;border-radius:6px;display:flex;align-items:center;transition:.15s" onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='none'">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
@@ -2253,6 +2352,7 @@ moveLead = function(leadId, newStatus, skipConfirm=false) {
 
 // Intercept login button
 document.addEventListener('DOMContentLoaded', async () => {
+  loadTheme();
   // Check if already logged in via token
   const savedUser = localStorage.getItem('wf_user');
   if(authToken && savedUser) {
@@ -8905,6 +9005,154 @@ function updateSidebarFoto(){
   }
 }
 
+
+function toggleTheme(){
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const newTheme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : '');
+  localStorage.setItem('wf_theme', newTheme);
+  const icon = document.getElementById('theme_icon');
+  if(icon){
+    icon.innerHTML = isDark
+      ? '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
+      : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+}
+
+function loadTheme(){
+  const saved = localStorage.getItem('wf_theme');
+  if(saved === 'light'){
+    document.documentElement.setAttribute('data-theme', 'light');
+    const icon = document.getElementById('theme_icon');
+    if(icon) icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  }
+}
+
+
+let buscaIdx = -1;
+
+function openBuscaGlobal(){
+  const el = document.getElementById('busca_overlay');
+  if(el){ el.style.display='flex'; }
+  setTimeout(()=>{
+    const inp = document.getElementById('busca_input');
+    if(inp){ inp.value=''; inp.focus(); }
+    renderBuscaResultados();
+  }, 50);
+}
+
+function closeBuscaGlobal(){
+  const el = document.getElementById('busca_overlay');
+  if(el) el.style.display='none';
+}
+
+function renderBuscaResultados(){
+  const q = document.getElementById('busca_input')?.value?.trim().toLowerCase();
+  const el = document.getElementById('busca_resultados');
+  if(!el) return;
+  buscaIdx = -1;
+
+  if(!q){
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">Digite para buscar clientes, pedidos ou leads...</div>';
+    return;
+  }
+
+  let results = [];
+
+  // Search pedidos
+  DB.clientes_pedidos.filter(p =>
+    p.nome?.toLowerCase().includes(q) ||
+    p.cpf?.includes(q) ||
+    p.tel?.includes(q) ||
+    p.email?.toLowerCase().includes(q)
+  ).slice(0,5).forEach(p => results.push({
+    type: 'pedido', icon: '📦', label: p.nome, sub: `Pedido · ${p.produto_nome||'—'} · ${fmt(p.plano_preco)}`,
+    tag: p.pagamento, tagColor: p.pagamento==='PAGO'?'var(--green)':p.pagamento==='PENDENTE'?'var(--amber)':'var(--red)',
+    action: ()=>{ closeBuscaGlobal(); navigate('clientes-pedidos'); setTimeout(()=>abrirPedido(p.id),300); }
+  }));
+
+  // Search leads
+  DB.leads.filter(l =>
+    l.cliente_nome?.toLowerCase().includes(q)
+  ).slice(0,5).forEach(l => results.push({
+    type: 'lead', icon: '🎯', label: l.cliente_nome, sub: `Lead · ${l.status_pipeline} · ${fmt(l.valor_divida)}`,
+    tag: l.status_pipeline, tagColor: 'var(--blue)',
+    action: ()=>{ closeBuscaGlobal(); navigate('kanban'); setTimeout(()=>openKbSidePanel(l.id),300); }
+  }));
+
+  // Search usuarios
+  if(currentUser?.tipo==='ADMIN'){
+    DB.users.filter(u =>
+      u.nome?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q)
+    ).slice(0,3).forEach(u => results.push({
+      type: 'usuario', icon: '👤', label: u.nome, sub: `Usuário · ${u.email}`,
+      tag: u.tipo, tagColor: 'var(--purple)',
+      action: ()=>{ closeBuscaGlobal(); navigate('equipe'); }
+    }));
+  }
+
+  if(!results.length){
+    el.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">Nenhum resultado para "<strong style="color:var(--text)">${q}</strong>"</div>`;
+    return;
+  }
+
+  el.innerHTML = results.map((r,i) => `
+    <div class="busca-item" data-idx="${i}" onclick="buscaSelectIdx(${i})" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius);cursor:pointer;transition:.1s">
+      <div style="font-size:18px;flex-shrink:0">${r.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.label}</div>
+        <div style="font-size:11px;color:var(--text3)">${r.sub}</div>
+      </div>
+      <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${r.tagColor}22;color:${r.tagColor};flex-shrink:0">${r.tag}</span>
+    </div>
+  `).join('');
+
+  // Store results for keyboard navigation
+  window._buscaResults = results;
+}
+
+function buscaSelectIdx(idx){
+  const results = window._buscaResults;
+  if(results && results[idx]) results[idx].action();
+}
+
+function navegarBusca(e){
+  const items = document.querySelectorAll('.busca-item');
+  if(e.key==='Escape'){ closeBuscaGlobal(); return; }
+  if(e.key==='ArrowDown'){ e.preventDefault(); buscaIdx=Math.min(buscaIdx+1,items.length-1); }
+  if(e.key==='ArrowUp'){ e.preventDefault(); buscaIdx=Math.max(buscaIdx-1,0); }
+  if(e.key==='Enter' && buscaIdx>=0){ buscaSelectIdx(buscaIdx); return; }
+  items.forEach((el,i)=>{
+    el.style.background = i===buscaIdx ? 'var(--bg3)' : '';
+    el.style.color = i===buscaIdx ? 'var(--text)' : '';
+  });
+}
+
+// Ctrl+K shortcut
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='k'){ e.preventDefault(); openBuscaGlobal(); }
+  if(e.key==='Escape') closeBuscaGlobal();
+});
+
+
+function toggleMobileMenu(){
+  document.querySelector('.sidebar').classList.toggle('mobile-open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+function closeMobileMenu(){
+  document.querySelector('.sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// Close sidebar on nav click in mobile
+const _origNavigate = navigate;
+navigate = function(pageId){
+  _origNavigate(pageId);
+  if(window.innerWidth <= 768) closeMobileMenu();
+};
+
 // ===== MODALS =====
 function openModal(id){
   document.getElementById(id).classList.add('open');
@@ -10032,6 +10280,26 @@ document.getElementById('appWrap').style.display='none';
     <button class="btn btn-primary" onclick="salvarMeuPerfil()" id="mp_save_btn">Salvar</button>
   </div>
 </div>
+</div>
+
+<!-- BUSCA GLOBAL -->
+<div id="busca_overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;align-items:flex-start;justify-content:center;padding-top:80px" onclick="if(event.target===this)closeBuscaGlobal()">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);width:600px;max-width:95vw;overflow:hidden;box-shadow:var(--shadow-lg)">
+    <!-- Search input -->
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="busca_input" placeholder="Buscar cliente, pedido, lead..." style="flex:1;background:none;border:none;outline:none;font-size:15px;color:var(--text)" oninput="renderBuscaResultados()" onkeydown="navegarBusca(event)">
+      <kbd style="font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);padding:2px 6px;border-radius:4px">ESC</kbd>
+    </div>
+    <!-- Results -->
+    <div id="busca_resultados" style="max-height:400px;overflow-y:auto;padding:8px"></div>
+    <!-- Footer -->
+    <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:16px;font-size:11px;color:var(--text3)">
+      <span>↑↓ navegar</span>
+      <span>Enter selecionar</span>
+      <span>ESC fechar</span>
+    </div>
+  </div>
 </div>
 </body>
 </html>
