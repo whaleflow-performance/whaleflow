@@ -17,7 +17,11 @@ export default async function handler(req, res) {
 
   const user = auth(req);
   if (!user) return res.status(401).json({ error: 'Nao autorizado' });
-  if (user.tipo !== 'ADMIN') return res.status(403).json({ error: 'Sem permissao' });
+
+  // Only GET allowed for non-admins
+  if (req.method !== 'GET' && req.method !== 'OPTIONS' && user.tipo !== 'ADMIN') {
+    return res.status(403).json({ error: 'Sem permissao' });
+  }
 
   try {
     if (req.method === 'GET') {
@@ -53,7 +57,6 @@ export default async function handler(req, res) {
         await sql`UPDATE usuarios SET nome=${u.nome}, email=${u.email}, tipo=${u.tipo}, vendedores=${JSON.stringify(u.vendedores||[])}::jsonb, cobradores=${JSON.stringify(u.cobradores||[])}::jsonb WHERE id=${uid}`;
       }
 
-      // Verify update worked
       const updated = await sql`SELECT id, nome, email, tipo, vendedores FROM usuarios WHERE id=${uid} LIMIT 1`;
       return res.status(200).json({ ok: true, user: updated[0] });
     }
