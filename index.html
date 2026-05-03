@@ -333,77 +333,82 @@ select option{background:var(--bg2)}
 .busca-item:hover{background:var(--bg3)}
 
 /* ===== MOBILE RESPONSIVO ===== */
-@media (max-width: 768px) {
-  body { flex-direction: column; }
+.mobile-only { display: none !important; }
 
-  /* Sidebar vira menu hamburguer */
+@media (max-width: 768px) {
+  .mobile-only { display: flex !important; }
+  .desktop-only { display: none !important; }
+
+  /* Sidebar hidden by default, slides in */
   .sidebar {
-    position: fixed;
-    left: -220px;
+    position: fixed !important;
+    left: -240px !important;
     top: 0;
     height: 100vh;
-    z-index: 200;
+    z-index: 400;
     transition: left .25s cubic-bezier(.4,0,.2,1);
+    box-shadow: none;
   }
-  .sidebar.mobile-open { left: 0; }
+  .sidebar.mobile-open {
+    left: 0 !important;
+    box-shadow: 4px 0 20px rgba(0,0,0,.5);
+  }
   .sidebar-overlay {
     display: none;
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,.5);
-    z-index: 199;
+    z-index: 399;
   }
   .sidebar-overlay.open { display: block; }
 
-  /* Main area ocupa tudo */
-  .main { width: 100%; min-width: 0; }
+  /* Main takes full width */
+  .main { width: 100% !important; min-width: 0; }
 
-  /* Topbar mobile */
-  .topbar {
-    padding: 10px 12px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .topbar-title { font-size: 14px; }
+  /* Topbar */
+  .topbar { padding: 8px 12px; position: sticky; top: 0; z-index: 100; }
+  .topbar-title { font-size: 13px; }
 
-  /* Hamburguer button */
-  #mobile_menu_btn { display: flex !important; }
+  /* Content */
+  .content { padding: 10px !important; }
+  .page { padding: 10px !important; }
 
-  /* Content padding menor */
-  .content { padding: 12px; }
+  /* KPI grids */
+  [style*="grid-template-columns:repeat(4"] { grid-template-columns: repeat(2,1fr) !important; }
+  [style*="grid-template-columns:repeat(3"] { grid-template-columns: repeat(2,1fr) !important; }
 
-  /* Cards em coluna */
-  .kpi-grid { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
-
-  /* Tabelas com scroll horizontal */
+  /* Tables */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 600px; }
 
-  /* Kanban scroll horizontal */
-  #kanbanBoard { overflow-x: auto; flex-wrap: nowrap !important; }
-  .kanban-col { min-width: 260px; }
+  /* Kanban */
+  #kanbanBoard { overflow-x: auto !important; flex-wrap: nowrap !important; padding-bottom: 12px; }
+  .kanban-col { min-width: 250px !important; flex-shrink: 0; }
 
-  /* Modais full screen em mobile */
-  .modal { width: 95vw !important; max-height: 90vh; overflow-y: auto; margin: 0; }
-  .modal-overlay { align-items: flex-end; padding: 0; }
+  /* Modals */
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .modal { width: 100vw !important; max-width: 100vw !important; border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important; max-height: 92vh; overflow-y: auto; }
 
-  /* Side panel full width */
+  /* Side panel */
   .kb-side-panel { width: 100vw !important; }
 
-  /* Grid usuarios em 1 coluna */
+  /* Search */
+  #busca_overlay { padding: 0 !important; align-items: flex-end !important; }
+  #busca_overlay > div { width: 100% !important; max-width: 100% !important; border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important; }
+
+  /* Usuarios grid */
   #eq_grid { grid-template-columns: 1fr !important; }
 
-  /* Esconder labels longos */
-  .topbar .filter-bar { display: none; }
+  /* Filter bar */
+  .topbar .filter-bar { display: none !important; }
 
-  /* Busca global full width */
-  #busca_overlay { padding-top: 20px; align-items: flex-start; }
-  #busca_overlay > div { width: 100% !important; max-width: 100% !important; border-radius: var(--radius) var(--radius) 0 0; }
+  /* Topbar actions - hide some on small screens */
+  #search_btn span { display: none; }
 }
 
 @media (max-width: 480px) {
-  .kpi-grid { grid-template-columns: 1fr 1fr !important; }
-  .content { padding: 8px; }
+  .content { padding: 8px !important; }
+  .page { padding: 8px !important; }
 }
 /* ===== END MOBILE ===== */
 
@@ -489,7 +494,7 @@ select option{background:var(--bg2)}
 <!-- MAIN -->
 <div class="main" id="mainArea">
 <div class="topbar">
-  <button id="mobile_menu_btn" onclick="toggleMobileMenu()" style="display:none;background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;margin-right:8px;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+  <button id="mobile_menu_btn" onclick="toggleMobileMenu()" class="mobile-only" style="background:none;border:none;cursor:pointer;color:var(--text2);padding:4px;margin-right:8px;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
   <div class="topbar-title" id="topbarTitle">Dashboard</div>
   <div class="filter-bar" id="filterBar">
     <button class="filter-btn active" onclick="setFilter(this,'hoje')">Hoje</button>
