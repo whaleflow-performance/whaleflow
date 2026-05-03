@@ -3701,7 +3701,21 @@ async function saveUsuario(){
   closeModal('modalUsuario');
   renderEquipe();
 }
-function deleteUser(id){if(id===currentUser.id){alert('Não pode remover seu próprio usuário.');return;}DB.users=DB.users.filter(u=>u.id!==id);renderEquipe();}
+async function deleteUser(id){
+  if(id===currentUser.id){ alert('Não pode remover seu próprio usuário.'); return; }
+  if(!confirm('Tem certeza que deseja excluir este usuário?')) return;
+  DB.users = DB.users.filter(u=>u.id!==id);
+  renderEquipe();
+  const token = authToken || localStorage.getItem('wf_token');
+  if(token){
+    try {
+      await fetch('/api/usuarios?id='+id, {
+        method: 'DELETE',
+        headers: {'Authorization': 'Bearer '+token}
+      });
+    } catch(e){ console.error('Erro ao deletar usuário:', e); }
+  }
+}
 
 // ===== HISTÓRICO =====
 function renderHistorico(){
