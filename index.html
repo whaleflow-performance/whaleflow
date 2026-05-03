@@ -9079,6 +9079,8 @@ function openModal(id){
     planoRowId=0;
   }
   if(id==='modalClientePedido'){
+    // Sync produtos before opening to get latest planos
+    syncProdutos().then(()=>populateProdutosSelect());
     populateProdutosSelect();
     cpFiles=[];
     renderCpFilesList();
@@ -9126,6 +9128,13 @@ function loadPlanosPedido(){
   infoDiv.style.display='none';
 }
 function closeModal(id){
+  if(id==='modalNovoPlano'){
+    const btn = document.querySelector('#modalNovoPlano .btn-primary');
+    if(btn){ btn.textContent='Salvar'; btn.onclick=salvarNovoPlano; btn.disabled=false; }
+    ['np_nome','np_preco','np_custo','np_frete'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+    const sel=document.getElementById('np_produto'); if(sel) sel.value='';
+    const st=document.getElementById('np_status'); if(st) st.value='ativo';
+  }
   if(id==='modalUsuario'){
     const btn=document.querySelector('#modalUsuario .btn-primary');
     if(btn){ btn.textContent='Criar Usuário'; btn.onclick=saveUsuario; btn.disabled=false; }
