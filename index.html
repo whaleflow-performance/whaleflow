@@ -2383,20 +2383,24 @@ function logout() {
 // Sync produtos from DB
 async function syncProdutos() {
   const data = await api.get('/api/produtos');
-  if(data && data.produtos) {
-    DB.produtos = data.produtos.map(p => ({
-      ...p,
-      planos: data.planos.filter(pl => pl.produto_id === p.id).map(pl => ({
-        ...pl,
-        id: pl.id,
-        nome: pl.nome,
-        preco: parseFloat(pl.preco)||0,
-        estoque: pl.estoque,
-        comissao_afil: pl.comissao_afil ? parseFloat(pl.comissao_afil) : null,
-        custo_produto: pl.custo_produto ? parseFloat(pl.custo_produto) : null,
-        frete: pl.frete ? parseFloat(pl.frete) : null,
-      }))
-    }));
+  if(data && data.produtos !== undefined) {
+    if(data.produtos.length > 0) {
+      // Use API data
+      DB.produtos = data.produtos.map(p => ({
+        ...p,
+        planos: (data.planos||[]).filter(pl => pl.produto_id === p.id).map(pl => ({
+          ...pl,
+          preco: parseFloat(pl.preco)||0,
+          estoque: pl.estoque,
+          comissao_afil: pl.comissao_afil ? parseFloat(pl.comissao_afil) : null,
+          custo_produto: pl.custo_produto ? parseFloat(pl.custo_produto) : null,
+          frete: pl.frete ? parseFloat(pl.frete) : null,
+        }))
+      }));
+    } else {
+      // API empty - clear local demos too
+      DB.produtos = [];
+    }
   }
 }
 
@@ -2779,17 +2783,7 @@ let DB = {
     {id:1,nome:'Admin',email:'admin@whaleflow.com',senha:'123456',tipo:'ADMIN',vendedores:[],cobradores:[],comissao_pct:30},
   ],
   clientes_pedidos: [],
-  produtos: [
-    {id:20,nome:'Plano Essencial',descricao:'Acesso básico à plataforma',categoria:'Software',status:'ATIVO',estoque_controlado:true,planos:[
-      {id:1,nome:'Mensal',quantidade:1,unidade:'mês',preco:97,estoque:50,comissao_afil:20},
-      {id:2,nome:'Trimestral',quantidade:3,unidade:'meses',preco:249,estoque:30,comissao_afil:50},
-      {id:3,nome:'Anual',quantidade:12,unidade:'meses',preco:797,estoque:15,comissao_afil:150},
-    ]},
-    {id:21,nome:'Curso de Vendas',descricao:'Treinamento completo para vendedores',categoria:'Educação',status:'ATIVO',estoque_controlado:true,planos:[
-      {id:4,nome:'Acesso Individual',quantidade:1,unidade:'acesso',preco:297,estoque:100,comissao_afil:60},
-      {id:5,nome:'Turma (5 pessoas)',quantidade:5,unidade:'acessos',preco:997,estoque:8,comissao_afil:200},
-    ]},
-  ],
+  produtos: [],
   webhooks: [
     {id:1,evento:'venda.pago',url:'https://hooks.zapier.com/hooks/catch/abc123',ativo:true,logs:[{status:200,data:'2025-04-30T10:22:00',resumo:'Empresa ABC — R$ 4.500,00'}]},
     {id:2,evento:'venda.agendado',url:'',ativo:false,logs:[]},
