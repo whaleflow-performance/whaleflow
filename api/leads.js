@@ -15,10 +15,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const user = auth(req);
-  if (!user) return res.status(401).json({ error: 'Não autorizado' });
+  if (!user) return res.status(401).json({ error: 'Nao autorizado' });
 
   try {
-    // GET - listar leads
     if (req.method === 'GET') {
       let leads;
       if (user.tipo === 'ADMIN') {
@@ -31,36 +30,40 @@ export default async function handler(req, res) {
       return res.status(200).json(leads);
     }
 
-    // POST - criar lead
     if (req.method === 'POST') {
       const l = req.body;
       const result = await sql`
         INSERT INTO leads (cliente_nome, valor_divida, status_pipeline, prioridade, cobrador_id, observacoes)
-        VALUES (${l.cliente_nome}, ${l.valor_divida}, ${l.status_pipeline||'D1'}, 
-                ${l.prioridade||'RISCO'}, ${l.cobrador_id}, ${l.observacoes})
+        VALUES (${l.cliente_nome}, ${l.valor_divida}, ${l.status_pipeline||'D1'}, ${l.prioridade||'RISCO'}, ${l.cobrador_id||null}, ${l.observacoes||''})
         RETURNING *`;
       return res.status(201).json(result[0]);
     }
 
-    // PUT - atualizar lead
     if (req.method === 'PUT') {
-      const { id, ...l } = req.body;
+      const l = req.body;
       const result = await sql`
         UPDATE leads SET
           status_pipeline = ${l.status_pipeline},
-          prioridade = ${l.prioridade},
-          observacoes = ${l.observacoes},
+          prioridade = ${l.prioridade||'RISCO'},
+          observacoes = ${l.observacoes||''},
           ultima_interacao = CURRENT_DATE,
-          followup_data = ${l.followup_data || null},
-          followup_obs = ${l.followup_obs || null},
-          followup_concluido = ${l.followup_concluido || false},
-          notas = ${JSON.stringify(l.notas || [])}::jsonb
-        WHERE id = ${id}
+          followup_data = ${l.followup_data||null},
+          followup_obs = ${l.followup_obs||null},
+          followup_concluido = ${l.followup_concluido||false},
+          notas = ${JSON.stringify(l.notas||[])}::jsonb
+        WHERE id = ${l.id}
         RETURNING *`;
       return res.status(200).json(result[0]);
     }
 
-    // DELETE - remover lead
     if (req.method === 'DELETE') {
       const { id } = req.query;
-      await sq
+      await sql`DELETE FROM leads WHERE id = ${id}`;
+      return res.status(200).json({ ok: true });
+    }
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  }
+}
