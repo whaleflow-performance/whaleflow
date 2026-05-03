@@ -2919,19 +2919,16 @@ function renderAdminDash(){
   // ── 4 KPIs TOPO ──────────────────────────────────────────
   const kgEl = document.getElementById('kpiGrid');
   if(kgEl) kgEl.innerHTML = [
-    {label:'FATURAMENTO APROVADO', val:fmt(totalPaid),  sub:`${paid.length} pagamentos aprovados`,      cor:'var(--green)', cmp:fmt(totalPaid*1.12), pct:'-88%', up:false},
-    {label:'FATURAMENTO AGENDADO', val:fmt(totalSched), sub:`${sched.length} agendamentos`,              cor:'var(--text)',  cmp:fmt(totalSched*1.08), pct:'-48%', up:false},
-    {label:'GASTOS EM ANÚNCIOS',   val:'R$ 0,00',       sub:'Nenhum registro',                           cor:'var(--text)',  cmp:'R$ 0,00',            pct:'',     up:true},
-    {label:'LUCRO TOTAL (PERÍODO)',val:fmt(lucro),       sub:'Somente pagamentos aprovados',              cor:'var(--text)',  cmp:fmt(lucro*1.95),      pct:'-95%', up:false},
+    {label:'FATURAMENTO APROVADO', val:fmt(totalPaid),  sub:`${paid.length} pagamentos aprovados`,   cor:'var(--green)'},
+    {label:'FATURAMENTO AGENDADO', val:fmt(totalSched), sub:`${sched.length} agendamentos`,           cor:'var(--text)'},
+    {label:'GASTOS EM ANÚNCIOS',   val:'R$ 0,00',       sub:'Nenhum registro',                        cor:'var(--text)'},
+    {label:'LUCRO TOTAL (PERÍODO)',val:fmt(lucro),       sub:'Somente pagamentos aprovados',           cor:'var(--text)'},
   ].map(k=>`
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;overflow:hidden">
       <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:8px">${k.label}</div>
       <div style="font-family:var(--font-display);font-size:26px;font-weight:700;color:${k.cor};line-height:1;margin-bottom:4px">${k.val}</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:12px">${k.sub}</div>
-      <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:10px">
-        <span style="color:var(--text3)">Ontem &nbsp; ${k.cmp}</span>
-        ${k.pct?`<span style="color:var(--red);font-weight:600">${k.pct}</span>`:''}
-      </div>
+
     </div>`).join('');
 
   // ── AGENDADO row 1 + row 2 ────────────────────────────────
@@ -3653,7 +3650,7 @@ function toggleVendedorSelect(){
   grp.style.display=tipo==='COBRADOR'?'block':'none';
   document.getElementById('afiliadoComissaoGroup') && (document.getElementById('afiliadoComissaoGroup').style.display=tipo==='AFILIADO'?'block':'none');
   if(tipo==='COBRADOR'){
-    const vends=DB.users.filter(u=>['VENDEDOR','AFILIADO'].includes(u.tipo));
+    const vends=DB.users.filter(u=>['VENDEDOR','AFILIADO','ADMIN'].includes(u.tipo));
     document.getElementById('vendedoresCheckboxes').innerHTML=vends.map(v=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="${v.id}" style="width:auto;margin:0"> ${v.nome}</label>`).join('');
   }
 }
