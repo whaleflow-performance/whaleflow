@@ -56,7 +56,7 @@ export default async function handler(req, res) {
             senha = ${hash},
             tipo = ${u.tipo},
             vendedores = ${JSON.stringify(u.vendedores || [])}::jsonb,
-            cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb
+            cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb;
           WHERE id = ${u.id}`;
       } else {
         await sql`
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
             email = ${u.email},
             tipo = ${u.tipo},
             vendedores = ${JSON.stringify(u.vendedores || [])}::jsonb,
-            cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb
+            cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb;
           WHERE id = ${u.id}`;
       }
       return res.status(200).json({ ok: true });
