@@ -16,6 +16,19 @@ function brazilDate() {
   return new Date().toLocaleDateString('en-CA', {timeZone: 'America/Sao_Paulo'});
 }
 
+async function getNextCobrador() {
+  const cobradores = await sql`SELECT id FROM usuarios WHERE tipo = 'COBRADOR' ORDER BY id`;
+  if (!cobradores.length) return null;
+  if (cobradores.length === 1) return cobradores[0].id;
+
+  const cfg = await sql`SELECT valor FROM config WHERE chave = 'ultimo_cobrador_idx' LIMIT 1`;
+  const lastIdx = parseInt(cfg[0]?.valor || '0');
+  const nextIdx = (lastIdx + 1) % cobradores.length;
+  await sql`UPDATE config SET valor = ${nextIdx.toString()} WHERE chave = 'ultimo_cobrador_idx'`;
+
+  return cobradores[nextIdx].id;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -41,12 +54,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, message: 'Pedido já existe', id: existing[0].id });
       }
 
+      const cobradorId = await getNextCobrador();
+
       const result = await sql`
         INSERT INTO pedidos (
           nome, cpf, email, tel,
           cep, rua, numero, bairro, cidade, uf,
           produto_nome, plano_nome, plano_preco,
-          pagamento, obs, data, id_externo
+          pagamento, obs, data, id_externo, cobrador_id
         ) VALUES (
           ${c?.name||''},
           ${(c?.document||'').replace(/\D/g,'')},
@@ -64,11 +79,12 @@ export default async function handler(req, res) {
           'PENDENTE',
           ${`Qtd: ${offer?.numberOfItems||1} | Projeto: ${body.project?.name||''}`},
           ${brazilDate()},
-          ${orderId}
+          ${orderId},
+          ${cobradorId}
         )
         RETURNING *`;
 
-      return res.status(201).json({ ok: true, pedido_id: result[0].id });
+      return res.status(201).json({ ok: true, pedido_id: result[0].id, cobrador_id: cobradorId });
     }
 
     if (event === 'SHIPPING_REGISTER') {
@@ -106,12 +122,13 @@ export default async function handler(req, res) {
       }
 
       if (wfStatus === 'ENTREGUE') {
+        const cobradorId = pedido.length ? pedido[0].cobrador_id : null;
         const leadExist = await sql`SELECT id FROM leads WHERE cliente_nome = ${nome} LIMIT 1`;
         if (!leadExist.length) {
           const valor = pedido.length ? (pedido[0].plano_preco||0) : (offer?.price||0);
           await sql`
-            INSERT INTO leads (cliente_nome, valor_divida, status_pipeline, prioridade, ultima_interacao)
-            VALUES (${nome}, ${valor}, 'D1', 'RISCO', ${brazilDate()})`;
+            INSERT INTO leads (cliente_nome, valor_divida, status_pipeline, prioridade, ultima_interacao, cobrador_id)
+            VALUES (${nome}, ${valor}, 'D1', 'RISCO', ${brazilDate()}, ${cobradorId})`;
         }
       }
 
