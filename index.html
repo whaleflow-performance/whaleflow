@@ -5,563 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WhaleFlow — Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
-// ===== API INTEGRATION =====
-const API_URL = '';
-let authToken = localStorage.getItem('wf_token') || null;
 
-const api = {
-  async req(method, path, body=null) {
-    const opts = {
-      method,
-      headers: { 'Content-Type': 'application/json', ...(authToken ? {'Authorization': 'Bearer '+authToken} : {}) }
-    };
-    if(body) opts.body = JSON.stringify(body);
-    try {
-      const r = await fetch(API_URL + path, opts);
-      const data = await r.json();
-      if(r.status===401){ logout(); return null; }
-      return data;
-    } catch(e) {
-      console.warn('API offline, usando dados locais:', e.message);
-      return null;
-    }
-  },
-  get:    (path)       => api.req('GET', path),
-  post:   (path, body) => api.req('POST', path, body),
-  put:    (path, body) => api.req('PUT', path, body),
-  delete: (path)       => api.req('DELETE', path),
-};
-
-// Override login to use real API
-async function loginWithAPI(email, senha) {
-  const result = await api.post('/api/auth', {email, senha});
-  if(result && result.token) {
-    authToken = result.token;
-    localStorage.setItem('wf_token', result.token);
-    localStorage.setItem('wf_user', JSON.stringify(result.user));
-    return result.user;
-  }
-  return null;
-}
-
-// Sync pedidos from DB on load
-async function syncPedidos() {
-  const data = await api.get('/api/pedidos');
-  if(data && Array.isArray(data) && data.length > 0) {
-    // Merge with local - API data takes priority
-    DB.clientes_pedidos = data.map(p => ({
-      ...p,
-      notas: p.notas || [],
-      links: p.links || [],
-      suspenso: p.suspenso || false,
-    }));
-    renderClientesPedidos();
-  }
-}
-
-// Sync leads from DB on load
-async function syncLeads() {
-  const data = await api.get('/api/leads');
-  if(data && Array.isArray(data) && data.length > 0) {
-    DB.leads = data.map(l => ({
-      ...l,
-      notas: l.notas || [],
-    }));
-    if(document.getElementById('page-kanban')?.classList.contains('active')) renderKanban();
-  }
-}
-
-// Sync usuarios from DB on load
-async function syncUsuarios() {
-  if(currentUser?.tipo !== 'ADMIN') return;
-  const data = await api.get('/api/usuarios');
-  if(data && Array.isArray(data) && data.length > 0) {
-    // Keep demo users structure but add real ones
-    DB.users = data.map(u => ({
-      ...u,
-      vendedores: u.vendedores || [],
-      cobradores: u.cobradores || [],
-      senha: '***'
-    }));
-    renderEquipe();
-  }
-}
-
-// Auto-save pedido to API when changed
-const _origMarcarStatus = marcarStatusPedido;
-marcarStatusPedido = async function(status) {
-  _origMarcarStatus(status);
-  const p = DB.clientes_pedidos.find(x=>x.id===pedidoAtivoId);
-  if(p) await api.put('/api/pedidos', p);
-};
-
-// Auto-save lead when moved
-const _origMoveLead = moveLead;
-moveLead = function(leadId, newStatus, skipConfirm=false) {
-  _origMoveLead(leadId, newStatus, skipConfirm);
-  const l = DB.leads.find(x=>x.id===leadId);
-  if(l && l.id < 10000) api.put('/api/leads', l); // only sync real DB leads
-};
-
-// Intercept login button
-document.addEventListener('DOMContentLoaded', async () => {
-  // Check if already logged in via token
-  const savedUser = localStorage.getItem('wf_user');
-  if(authToken && savedUser) {
-    try {
-      const u = JSON.parse(savedUser);
-      // Verify token by decoding it locally (no API call needed)
-      const payload = JSON.parse(atob(authToken.split('.')[1]));
-      const expired = payload.exp * 1000 < Date.now();
-      if(!expired) {
-        // Token still valid - auto login
-        currentUser = u;
-        document.getElementById('loginWrap').style.display = 'none';
-        document.getElementById('appWrap').style.cssText = 'display:flex;width:100%';
-        setupSidebar();
-        navigateDefault();
-        setTimeout(()=>{ fullSync(); startPolling(); }, 500);
-        return;
-      } else {
-        // Token expired - clear and show login
-        localStorage.removeItem('wf_token');
-        localStorage.removeItem('wf_user');
-        authToken = null;
-      }
-    } catch(e) {
-      localStorage.removeItem('wf_token');
-      localStorage.removeItem('wf_user');
-      authToken = null;
-    }
-  }
-
-  // Override login button
-  const loginBtn = document.querySelector('#loginWrap button[onclick="handleLogin()"]') ||
-                   document.querySelector('#loginWrap .btn-primary');
-  if(loginBtn) {
-    const origOnclick = loginBtn.getAttribute('onclick');
-    loginBtn.onclick = async function() {
-      const email = document.getElementById('loginEmail')?.value;
-      const senha = document.getElementById('loginPass')?.value || document.getElementById('loginPass')?.value;
-      
-      // Try API first
-      const apiUser = await loginWithAPI(email, senha);
-      if(apiUser) {
-        const demoUser = DB.users.find(x=>x.email===email) || apiUser;
-        currentUser = {...demoUser, ...apiUser};
-        document.getElementById('loginError').style.display='none';
-        document.getElementById('loginWrap').style.display='none';
-        document.getElementById('appWrap').style.display='flex';
-        setupSidebar();
-        navigateDefault();
-        setTimeout(()=>{ fullSync(); startPolling(); }, 500);
-      } else {
-        // Fallback to local login
-        handleLogin();
-      }
-    };
-  }
-});
-
-function logout() {
-  stopPolling();
-  authToken = null;
-  localStorage.removeItem('wf_token');
-  localStorage.removeItem('wf_user');
-  location.reload();
-}
-
-// ===== SYNC FUNCTIONS =====
-
-// Sync produtos from DB
-async function syncProdutos() {
-  const data = await api.get('/api/produtos');
-  if(data && data.produtos) {
-    DB.produtos = data.produtos.map(p => ({
-      ...p,
-      planos: data.planos.filter(pl => pl.produto_id === p.id).map(pl => ({
-        ...pl,
-        id: pl.id,
-        nome: pl.nome,
-        preco: parseFloat(pl.preco)||0,
-        estoque: pl.estoque,
-        comissao_afil: pl.comissao_afil ? parseFloat(pl.comissao_afil) : null,
-        custo_produto: pl.custo_produto ? parseFloat(pl.custo_produto) : null,
-        frete: pl.frete ? parseFloat(pl.frete) : null,
-      }))
-    }));
-  }
-}
-
-// Sync frustracoes
-async function syncFrustracoes() {
-  const data = await api.get('/api/frustracoes');
-  if(data && Array.isArray(data)) DB.frustracoes = data;
-}
-
-// Auto-save pedido to API
-async function savePedidoAPI(pedido) {
-  if(!authToken) return;
-  if(pedido.id && pedido.id < 10000) {
-    // Existing DB record - update
-    await api.put('/api/pedidos', pedido);
-  }
-}
-
-// Auto-save lead to API  
-async function saveLeadAPI(lead) {
-  if(!authToken || !lead) return;
-  if(lead.id && lead.id < 10000) {
-    await api.put('/api/leads', lead);
-  }
-}
-
-// Override saveClientePedido to also save to API
-const _origSaveClientePedido = saveClientePedido;
-saveClientePedido = async function() {
-  _origSaveClientePedido();
-  // Get the last created pedido and save to API
-  const lastPed = DB.clientes_pedidos[DB.clientes_pedidos.length-1];
-  if(lastPed && authToken) {
-    const result = await api.post('/api/pedidos', lastPed);
-    if(result && result.id) {
-      // Update local id to DB id
-      lastPed._dbId = result.id;
-    }
-  }
-};
-
-// Override saveFrustracao to save to API
-const _origSaveFrustracao = saveFrustracao;
-saveFrustracao = async function() {
-  _origSaveFrustracao();
-  const lastF = DB.frustracoes[0];
-  if(lastF && authToken) {
-    await api.post('/api/frustracoes', lastF);
-  }
-};
-
-// Full sync on login
-async function fullSync() {
-  await Promise.all([
-    syncPedidos(),
-    syncLeads(),
-    syncUsuarios(),
-    syncProdutos(),
-    syncFrustracoes(),
-  ]);
-}
-
-// ===== END SYNC FUNCTIONS =====
-
-
-// ===== AUTO SYNC (polling a cada 30s) =====
-let _pollInterval = null;
-
-function startPolling(){
-  if(_pollInterval) return;
-  _pollInterval = setInterval(async ()=>{
-    if(!authToken) { stopPolling(); return; }
-    // Sync silently based on active page
-    const active = document.querySelector('.page.active');
-    if(!active) return;
-    const pageId = active.id.replace('page-','');
-
-    if(['clientes-pedidos','detalhe-pedido','aprovacoes'].includes(pageId)){
-      const data = await api.get('/api/pedidos');
-      if(data && Array.isArray(data)){
-        // Merge - add new ones from server
-        data.forEach(p=>{
-          if(!DB.clientes_pedidos.find(x=>x.id===p.id)){
-            DB.clientes_pedidos.push({...p, notas:p.notas||[], links:p.links||[], suspenso:p.suspenso||false});
-          }
-        });
-        if(pageId==='clientes-pedidos') renderClientesPedidos();
-        if(pageId==='aprovacoes') renderAprovacoes();
-      }
-    }
-
-    if(['kanban','followup-leads'].includes(pageId)){
-      const data = await api.get('/api/leads');
-      if(data && Array.isArray(data)){
-        data.forEach(l=>{
-          const existing = DB.leads.find(x=>x.id===l.id);
-          if(!existing) DB.leads.push({...l, notas:l.notas||[]});
-          else if(existing.status_pipeline !== l.status_pipeline){
-            existing.status_pipeline = l.status_pipeline;
-          }
-        });
-        if(pageId==='kanban') renderKanban();
-        if(pageId==='followup-leads') renderFollowupLeads();
-      }
-    }
-
-    if(pageId==='dashboard') renderAdminDash();
-
-  }, 30000); // 30 segundos
-}
-
-function stopPolling(){
-  if(_pollInterval){ clearInterval(_pollInterval); _pollInterval=null; }
-}
-// ===== END AUTO SYNC =====
-
-
-// ===== SYNC NOTAS, FOLLOWUP, RASTREAMENTO =====
-
-// Sync rastreamento
-async function syncRastreamento() {
-  const data = await api.get('/api/rastreamento');
-  if(data && Array.isArray(data)) {
-    DB.pedidos = data.map(r => ({
-      id: r.id,
-      cliente_nome: r.cliente_nome,
-      codigo_rastreio: r.codigo_rastreio,
-      status_entrega: r.status_entrega,
-      data_envio: r.data_envio,
-      ultima_atualizacao: r.ultima_atualizacao,
-    }));
-  }
-}
-
-// Sync followup pedidos
-async function syncFollowupPedidos() {
-  const data = await api.get('/api/followup');
-  if(data && Array.isArray(data)) {
-    data.forEach(fp => {
-      const p = DB.clientes_pedidos.find(x => x.id === fp.id);
-      if(p) {
-        p.followup_data = fp.followup_data;
-        p.followup_obs = fp.followup_obs;
-        p.followup_concluido = fp.followup_concluido;
-      }
-    });
-  }
-}
-
-// Override salvarFollowup to save to API
-const _origSalvarFollowup = salvarFollowup;
-salvarFollowup = async function() {
-  _origSalvarFollowup();
-  const p = DB.clientes_pedidos.find(x => x.id === pedidoAtivoId);
-  if(p && authToken) {
-    await api.put('/api/followup', {
-      id: p.id,
-      followup_data: p.followup_data,
-      followup_obs: p.followup_obs,
-      followup_concluido: p.followup_concluido || false
-    });
-  }
-};
-
-// Override adicionarNotaExpand to save to API
-const _origAdicionarNotaExpand = adicionarNotaExpand;
-adicionarNotaExpand = async function(pedidoId) {
-  _origAdicionarNotaExpand(pedidoId);
-  if(authToken) {
-    const input = document.getElementById('expand-nota-input-' + pedidoId);
-    // Note was already added to DB.clientes_pedidos by original function
-    const p = DB.clientes_pedidos.find(x => x.id === pedidoId);
-    if(p) await api.put('/api/pedidos', p);
-  }
-};
-
-// Override savePedido (rastreamento) to save to API
-const _origSavePedido = savePedido;
-savePedido = async function() {
-  _origSavePedido();
-  const last = DB.pedidos[DB.pedidos.length - 1];
-  if(last && authToken) {
-    const result = await api.post('/api/rastreamento', last);
-    if(result && result.id) last.id = result.id;
-  }
-};
-
-// Override deletePedido (rastreamento) to delete from API
-const _origDeletePedido = deletePedido;
-deletePedido = async function(id) {
-  _origDeletePedido(id);
-  if(authToken) await api.delete('/api/rastreamento?id=' + id);
-};
-
-// Override atualizarStatusRastreio to save to API
-const _origAtualizarStatus = atualizarStatusRastreio;
-atualizarStatusRastreio = async function(pedidoId, novoStatus) {
-  _origAtualizarStatus(pedidoId, novoStatus);
-  if(authToken) await api.put('/api/rastreamento', { id: pedidoId, status_entrega: novoStatus });
-};
-
-// Add rastreamento to fullSync
-const _origFullSync = fullSync;
-fullSync = async function() {
-  await _origFullSync();
-  await syncRastreamento();
-  await syncFollowupPedidos();
-};
-
-// Add rastreamento to polling
-const _origStartPolling = startPolling;
-startPolling = function() {
-  _origStartPolling();
-};
-
-
-
-// ===== SYNC PRODUTOS E PLANOS =====
-
-// Override saveProduto to save to API
-const _origSaveProduto = saveProduto;
-saveProduto = async function() {
-  const nome = document.getElementById('prod_nome')?.value?.trim();
-  if(!nome) return;
-  
-  _origSaveProduto();
-  
-  if(authToken) {
-    const last = DB.produtos[DB.produtos.length-1];
-    // Save produto
-    const result = await api.post('/api/produtos', {tipo:'produto', nome: last.nome, descricao: last.descricao||'', estoque_controlado: last.estoque_controlado||false});
-    if(result && result.id) {
-      last._dbId = result.id;
-      // Save each plano
-      for(const pl of last.planos||[]) {
-        const rpl = await api.post('/api/produtos', {tipo:'plano', produto_id: result.id, ...pl});
-        if(rpl && rpl.id) pl._dbId = rpl.id;
-      }
-    }
-  }
-};
-
-// Override deletarProduto to delete from API
-const _origDeletarProduto = deletarProduto;
-deletarProduto = async function(id) {
-  _origDeletarProduto(id);
-  if(authToken) await api.delete('/api/produtos?tipo=produto&id='+id);
-};
-
-// Override deletarPlano to delete from API
-const _origDeletarPlano = deletarPlano;
-deletarPlano = async function(prodId, planoId) {
-  _origDeletarPlano(prodId, planoId);
-  if(authToken) await api.delete('/api/produtos?tipo=plano&id='+planoId);
-};
-
-// Override salvarNovoPlano to save to API
-const _origSalvarNovoPlano = salvarNovoPlano;
-salvarNovoPlano = async function() {
-  _origSalvarNovoPlano();
-  if(authToken) {
-    const pr = DB.produtos.find(p=>p.id===parseInt(document.getElementById('np_produto')?.value));
-    const lastPlano = pr?.planos?.[pr.planos.length-1];
-    if(lastPlano && pr) {
-      const result = await api.post('/api/produtos', {tipo:'plano', produto_id: pr.id, ...lastPlano});
-      if(result && result.id) lastPlano._dbId = result.id;
-    }
-  }
-};
-
-// Override editarComissaoPlano to save to API
-const _origSalvarComissaoPlano = salvarComissaoPlano;
-salvarComissaoPlano = async function() {
-  _origSalvarComissaoPlano();
-  if(authToken) {
-    const prodId = parseInt(document.getElementById('ecp_prod_id').value);
-    const planoId = parseInt(document.getElementById('ecp_plano_id').value);
-    const pr = DB.produtos.find(p=>p.id===prodId);
-    const pl = pr?.planos?.find(x=>x.id===planoId);
-    if(pl) await api.put('/api/produtos', {tipo:'plano', id: planoId, ...pl});
-  }
-};
-
-
-
-// ===== SYNC LEADS CRIAÇÃO =====
-
-// Override criarLeadDeEntrega to save to API
-const _origCriarLead = criarLeadDeEntrega;
-criarLeadDeEntrega = async function(pedido) {
-  _origCriarLead(pedido);
-  if(authToken) {
-    const lead = DB.leads[DB.leads.length-1];
-    if(lead) {
-      const result = await api.post('/api/leads', lead);
-      if(result && result.id) lead.id = result.id;
-    }
-  }
-};
-
-// Override confirmarNegociacao to save followup to API
-const _origConfirmarNegociacao = confirmarNegociacao;
-confirmarNegociacao = async function() {
-  _origConfirmarNegociacao();
-  if(authToken && kbActiveLead) {
-    const lead = DB.leads.find(l=>l.id===kbActiveLead);
-    if(lead) await api.put('/api/leads', lead);
-  }
-};
-
-// Override concluirFollowupLead to save to API
-const _origConcluirFollowupLead = concluirFollowupLead;
-concluirFollowupLead = async function(leadId) {
-  _origConcluirFollowupLead(leadId);
-  if(authToken) {
-    const lead = DB.leads.find(x=>x.id===leadId);
-    if(lead) await api.put('/api/leads', lead);
-  }
-};
-
-// Override confirmarPerdaExecutar to delete lead from API
-const _origConfirmarPerda = confirmarPerdaExecutar;
-confirmarPerdaExecutar = async function() {
-  const id = kbActiveLead;
-  _origConfirmarPerda();
-  if(authToken && id) await api.delete('/api/leads?id='+id);
-};
-
-
-
-// ===== SYNC USUARIOS EDIÇÃO =====
-
-// Override editarUsuario save button to use API
-const _origEditarUsuario = editarUsuario;
-editarUsuario = function(id) {
-  _origEditarUsuario(id);
-  // Override the update button to also call API
-  setTimeout(()=>{
-    const btn = document.querySelector('#modalUsuario .btn-primary');
-    if(btn && btn.textContent === 'Atualizar'){
-      const origOnclick = btn.onclick;
-      btn.onclick = async function() {
-        origOnclick();
-        if(authToken) {
-          const u = DB.users.find(x=>x.id===id);
-          if(u) {
-            const senha = document.getElementById('u_senha')?.value;
-            await api.put('/api/usuarios', {
-              id: u.id,
-              nome: u.nome,
-              email: u.email,
-              tipo: u.tipo,
-              vendedores: u.vendedores||[],
-              cobradores: u.cobradores||[],
-              ...(senha ? {senha} : {})
-            });
-          }
-        }
-      };
-    }
-  }, 100);
-};
-
-// Override deleteUser to delete from API
-const _origDeleteUser = deleteUser;
-deleteUser = async function(id) {
-  _origDeleteUser(id);
-  if(authToken) await api.delete('/api/usuarios?id='+id);
-};
-
-
-// ===== END API INTEGRATION =====
 
 </script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@600;700&display=swap" rel="stylesheet">
@@ -2709,6 +2153,564 @@ select option{background:var(--bg2)}
 </div>
 
 <script>
+// ===== API INTEGRATION =====
+const API_URL = '';
+let authToken = localStorage.getItem('wf_token') || null;
+
+const api = {
+  async req(method, path, body=null) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(authToken ? {'Authorization': 'Bearer '+authToken} : {}) }
+    };
+    if(body) opts.body = JSON.stringify(body);
+    try {
+      const r = await fetch(API_URL + path, opts);
+      const data = await r.json();
+      if(r.status===401){ logout(); return null; }
+      return data;
+    } catch(e) {
+      console.warn('API offline, usando dados locais:', e.message);
+      return null;
+    }
+  },
+  get:    (path)       => api.req('GET', path),
+  post:   (path, body) => api.req('POST', path, body),
+  put:    (path, body) => api.req('PUT', path, body),
+  delete: (path)       => api.req('DELETE', path),
+};
+
+// Override login to use real API
+async function loginWithAPI(email, senha) {
+  const result = await api.post('/api/auth', {email, senha});
+  if(result && result.token) {
+    authToken = result.token;
+    localStorage.setItem('wf_token', result.token);
+    localStorage.setItem('wf_user', JSON.stringify(result.user));
+    return result.user;
+  }
+  return null;
+}
+
+// Sync pedidos from DB on load
+async function syncPedidos() {
+  const data = await api.get('/api/pedidos');
+  if(data && Array.isArray(data) && data.length > 0) {
+    // Merge with local - API data takes priority
+    DB.clientes_pedidos = data.map(p => ({
+      ...p,
+      notas: p.notas || [],
+      links: p.links || [],
+      suspenso: p.suspenso || false,
+    }));
+    renderClientesPedidos();
+  }
+}
+
+// Sync leads from DB on load
+async function syncLeads() {
+  const data = await api.get('/api/leads');
+  if(data && Array.isArray(data) && data.length > 0) {
+    DB.leads = data.map(l => ({
+      ...l,
+      notas: l.notas || [],
+    }));
+    if(document.getElementById('page-kanban')?.classList.contains('active')) renderKanban();
+  }
+}
+
+// Sync usuarios from DB on load
+async function syncUsuarios() {
+  if(currentUser?.tipo !== 'ADMIN') return;
+  const data = await api.get('/api/usuarios');
+  if(data && Array.isArray(data) && data.length > 0) {
+    // Keep demo users structure but add real ones
+    DB.users = data.map(u => ({
+      ...u,
+      vendedores: u.vendedores || [],
+      cobradores: u.cobradores || [],
+      senha: '***'
+    }));
+    renderEquipe();
+  }
+}
+
+// Auto-save pedido to API when changed
+const _origMarcarStatus = marcarStatusPedido;
+marcarStatusPedido = async function(status) {
+  _origMarcarStatus(status);
+  const p = DB.clientes_pedidos.find(x=>x.id===pedidoAtivoId);
+  if(p) await api.put('/api/pedidos', p);
+};
+
+// Auto-save lead when moved
+const _origMoveLead = moveLead;
+moveLead = function(leadId, newStatus, skipConfirm=false) {
+  _origMoveLead(leadId, newStatus, skipConfirm);
+  const l = DB.leads.find(x=>x.id===leadId);
+  if(l && l.id < 10000) api.put('/api/leads', l); // only sync real DB leads
+};
+
+// Intercept login button
+document.addEventListener('DOMContentLoaded', async () => {
+  // Check if already logged in via token
+  const savedUser = localStorage.getItem('wf_user');
+  if(authToken && savedUser) {
+    try {
+      const u = JSON.parse(savedUser);
+      // Verify token by decoding it locally (no API call needed)
+      const payload = JSON.parse(atob(authToken.split('.')[1]));
+      const expired = payload.exp * 1000 < Date.now();
+      if(!expired) {
+        // Token still valid - auto login
+        currentUser = u;
+        document.getElementById('loginWrap').style.display = 'none';
+        document.getElementById('appWrap').style.cssText = 'display:flex;width:100%';
+        setupSidebar();
+        navigateDefault();
+        setTimeout(()=>{ fullSync(); startPolling(); }, 500);
+        return;
+      } else {
+        // Token expired - clear and show login
+        localStorage.removeItem('wf_token');
+        localStorage.removeItem('wf_user');
+        authToken = null;
+      }
+    } catch(e) {
+      localStorage.removeItem('wf_token');
+      localStorage.removeItem('wf_user');
+      authToken = null;
+    }
+  }
+
+  // Override login button
+  const loginBtn = document.querySelector('#loginWrap button[onclick="handleLogin()"]') ||
+                   document.querySelector('#loginWrap .btn-primary');
+  if(loginBtn) {
+    const origOnclick = loginBtn.getAttribute('onclick');
+    loginBtn.onclick = async function() {
+      const email = document.getElementById('loginEmail')?.value;
+      const senha = document.getElementById('loginPass')?.value || document.getElementById('loginPass')?.value;
+      
+      // Try API first
+      const apiUser = await loginWithAPI(email, senha);
+      if(apiUser) {
+        const demoUser = DB.users.find(x=>x.email===email) || apiUser;
+        currentUser = {...demoUser, ...apiUser};
+        document.getElementById('loginError').style.display='none';
+        document.getElementById('loginWrap').style.display='none';
+        document.getElementById('appWrap').style.display='flex';
+        setupSidebar();
+        navigateDefault();
+        setTimeout(()=>{ fullSync(); startPolling(); }, 500);
+      } else {
+        // Fallback to local login
+        handleLogin();
+      }
+    };
+  }
+});
+
+function logout() {
+  stopPolling();
+  authToken = null;
+  localStorage.removeItem('wf_token');
+  localStorage.removeItem('wf_user');
+  location.reload();
+}
+
+// ===== SYNC FUNCTIONS =====
+
+// Sync produtos from DB
+async function syncProdutos() {
+  const data = await api.get('/api/produtos');
+  if(data && data.produtos) {
+    DB.produtos = data.produtos.map(p => ({
+      ...p,
+      planos: data.planos.filter(pl => pl.produto_id === p.id).map(pl => ({
+        ...pl,
+        id: pl.id,
+        nome: pl.nome,
+        preco: parseFloat(pl.preco)||0,
+        estoque: pl.estoque,
+        comissao_afil: pl.comissao_afil ? parseFloat(pl.comissao_afil) : null,
+        custo_produto: pl.custo_produto ? parseFloat(pl.custo_produto) : null,
+        frete: pl.frete ? parseFloat(pl.frete) : null,
+      }))
+    }));
+  }
+}
+
+// Sync frustracoes
+async function syncFrustracoes() {
+  const data = await api.get('/api/frustracoes');
+  if(data && Array.isArray(data)) DB.frustracoes = data;
+}
+
+// Auto-save pedido to API
+async function savePedidoAPI(pedido) {
+  if(!authToken) return;
+  if(pedido.id && pedido.id < 10000) {
+    // Existing DB record - update
+    await api.put('/api/pedidos', pedido);
+  }
+}
+
+// Auto-save lead to API  
+async function saveLeadAPI(lead) {
+  if(!authToken || !lead) return;
+  if(lead.id && lead.id < 10000) {
+    await api.put('/api/leads', lead);
+  }
+}
+
+// Override saveClientePedido to also save to API
+const _origSaveClientePedido = saveClientePedido;
+saveClientePedido = async function() {
+  _origSaveClientePedido();
+  // Get the last created pedido and save to API
+  const lastPed = DB.clientes_pedidos[DB.clientes_pedidos.length-1];
+  if(lastPed && authToken) {
+    const result = await api.post('/api/pedidos', lastPed);
+    if(result && result.id) {
+      // Update local id to DB id
+      lastPed._dbId = result.id;
+    }
+  }
+};
+
+// Override saveFrustracao to save to API
+const _origSaveFrustracao = saveFrustracao;
+saveFrustracao = async function() {
+  _origSaveFrustracao();
+  const lastF = DB.frustracoes[0];
+  if(lastF && authToken) {
+    await api.post('/api/frustracoes', lastF);
+  }
+};
+
+// Full sync on login
+async function fullSync() {
+  await Promise.all([
+    syncPedidos(),
+    syncLeads(),
+    syncUsuarios(),
+    syncProdutos(),
+    syncFrustracoes(),
+  ]);
+}
+
+// ===== END SYNC FUNCTIONS =====
+
+
+// ===== AUTO SYNC (polling a cada 30s) =====
+let _pollInterval = null;
+
+function startPolling(){
+  if(_pollInterval) return;
+  _pollInterval = setInterval(async ()=>{
+    if(!authToken) { stopPolling(); return; }
+    // Sync silently based on active page
+    const active = document.querySelector('.page.active');
+    if(!active) return;
+    const pageId = active.id.replace('page-','');
+
+    if(['clientes-pedidos','detalhe-pedido','aprovacoes'].includes(pageId)){
+      const data = await api.get('/api/pedidos');
+      if(data && Array.isArray(data)){
+        // Merge - add new ones from server
+        data.forEach(p=>{
+          if(!DB.clientes_pedidos.find(x=>x.id===p.id)){
+            DB.clientes_pedidos.push({...p, notas:p.notas||[], links:p.links||[], suspenso:p.suspenso||false});
+          }
+        });
+        if(pageId==='clientes-pedidos') renderClientesPedidos();
+        if(pageId==='aprovacoes') renderAprovacoes();
+      }
+    }
+
+    if(['kanban','followup-leads'].includes(pageId)){
+      const data = await api.get('/api/leads');
+      if(data && Array.isArray(data)){
+        data.forEach(l=>{
+          const existing = DB.leads.find(x=>x.id===l.id);
+          if(!existing) DB.leads.push({...l, notas:l.notas||[]});
+          else if(existing.status_pipeline !== l.status_pipeline){
+            existing.status_pipeline = l.status_pipeline;
+          }
+        });
+        if(pageId==='kanban') renderKanban();
+        if(pageId==='followup-leads') renderFollowupLeads();
+      }
+    }
+
+    if(pageId==='dashboard') renderAdminDash();
+
+  }, 30000); // 30 segundos
+}
+
+function stopPolling(){
+  if(_pollInterval){ clearInterval(_pollInterval); _pollInterval=null; }
+}
+// ===== END AUTO SYNC =====
+
+
+// ===== SYNC NOTAS, FOLLOWUP, RASTREAMENTO =====
+
+// Sync rastreamento
+async function syncRastreamento() {
+  const data = await api.get('/api/rastreamento');
+  if(data && Array.isArray(data)) {
+    DB.pedidos = data.map(r => ({
+      id: r.id,
+      cliente_nome: r.cliente_nome,
+      codigo_rastreio: r.codigo_rastreio,
+      status_entrega: r.status_entrega,
+      data_envio: r.data_envio,
+      ultima_atualizacao: r.ultima_atualizacao,
+    }));
+  }
+}
+
+// Sync followup pedidos
+async function syncFollowupPedidos() {
+  const data = await api.get('/api/followup');
+  if(data && Array.isArray(data)) {
+    data.forEach(fp => {
+      const p = DB.clientes_pedidos.find(x => x.id === fp.id);
+      if(p) {
+        p.followup_data = fp.followup_data;
+        p.followup_obs = fp.followup_obs;
+        p.followup_concluido = fp.followup_concluido;
+      }
+    });
+  }
+}
+
+// Override salvarFollowup to save to API
+const _origSalvarFollowup = salvarFollowup;
+salvarFollowup = async function() {
+  _origSalvarFollowup();
+  const p = DB.clientes_pedidos.find(x => x.id === pedidoAtivoId);
+  if(p && authToken) {
+    await api.put('/api/followup', {
+      id: p.id,
+      followup_data: p.followup_data,
+      followup_obs: p.followup_obs,
+      followup_concluido: p.followup_concluido || false
+    });
+  }
+};
+
+// Override adicionarNotaExpand to save to API
+const _origAdicionarNotaExpand = adicionarNotaExpand;
+adicionarNotaExpand = async function(pedidoId) {
+  _origAdicionarNotaExpand(pedidoId);
+  if(authToken) {
+    const input = document.getElementById('expand-nota-input-' + pedidoId);
+    // Note was already added to DB.clientes_pedidos by original function
+    const p = DB.clientes_pedidos.find(x => x.id === pedidoId);
+    if(p) await api.put('/api/pedidos', p);
+  }
+};
+
+// Override savePedido (rastreamento) to save to API
+const _origSavePedido = savePedido;
+savePedido = async function() {
+  _origSavePedido();
+  const last = DB.pedidos[DB.pedidos.length - 1];
+  if(last && authToken) {
+    const result = await api.post('/api/rastreamento', last);
+    if(result && result.id) last.id = result.id;
+  }
+};
+
+// Override deletePedido (rastreamento) to delete from API
+const _origDeletePedido = deletePedido;
+deletePedido = async function(id) {
+  _origDeletePedido(id);
+  if(authToken) await api.delete('/api/rastreamento?id=' + id);
+};
+
+// Override atualizarStatusRastreio to save to API
+const _origAtualizarStatus = atualizarStatusRastreio;
+atualizarStatusRastreio = async function(pedidoId, novoStatus) {
+  _origAtualizarStatus(pedidoId, novoStatus);
+  if(authToken) await api.put('/api/rastreamento', { id: pedidoId, status_entrega: novoStatus });
+};
+
+// Add rastreamento to fullSync
+const _origFullSync = fullSync;
+fullSync = async function() {
+  await _origFullSync();
+  await syncRastreamento();
+  await syncFollowupPedidos();
+};
+
+// Add rastreamento to polling
+const _origStartPolling = startPolling;
+startPolling = function() {
+  _origStartPolling();
+};
+
+
+
+// ===== SYNC PRODUTOS E PLANOS =====
+
+// Override saveProduto to save to API
+const _origSaveProduto = saveProduto;
+saveProduto = async function() {
+  const nome = document.getElementById('prod_nome')?.value?.trim();
+  if(!nome) return;
+  
+  _origSaveProduto();
+  
+  if(authToken) {
+    const last = DB.produtos[DB.produtos.length-1];
+    // Save produto
+    const result = await api.post('/api/produtos', {tipo:'produto', nome: last.nome, descricao: last.descricao||'', estoque_controlado: last.estoque_controlado||false});
+    if(result && result.id) {
+      last._dbId = result.id;
+      // Save each plano
+      for(const pl of last.planos||[]) {
+        const rpl = await api.post('/api/produtos', {tipo:'plano', produto_id: result.id, ...pl});
+        if(rpl && rpl.id) pl._dbId = rpl.id;
+      }
+    }
+  }
+};
+
+// Override deletarProduto to delete from API
+const _origDeletarProduto = deletarProduto;
+deletarProduto = async function(id) {
+  _origDeletarProduto(id);
+  if(authToken) await api.delete('/api/produtos?tipo=produto&id='+id);
+};
+
+// Override deletarPlano to delete from API
+const _origDeletarPlano = deletarPlano;
+deletarPlano = async function(prodId, planoId) {
+  _origDeletarPlano(prodId, planoId);
+  if(authToken) await api.delete('/api/produtos?tipo=plano&id='+planoId);
+};
+
+// Override salvarNovoPlano to save to API
+const _origSalvarNovoPlano = salvarNovoPlano;
+salvarNovoPlano = async function() {
+  _origSalvarNovoPlano();
+  if(authToken) {
+    const pr = DB.produtos.find(p=>p.id===parseInt(document.getElementById('np_produto')?.value));
+    const lastPlano = pr?.planos?.[pr.planos.length-1];
+    if(lastPlano && pr) {
+      const result = await api.post('/api/produtos', {tipo:'plano', produto_id: pr.id, ...lastPlano});
+      if(result && result.id) lastPlano._dbId = result.id;
+    }
+  }
+};
+
+// Override editarComissaoPlano to save to API
+const _origSalvarComissaoPlano = salvarComissaoPlano;
+salvarComissaoPlano = async function() {
+  _origSalvarComissaoPlano();
+  if(authToken) {
+    const prodId = parseInt(document.getElementById('ecp_prod_id').value);
+    const planoId = parseInt(document.getElementById('ecp_plano_id').value);
+    const pr = DB.produtos.find(p=>p.id===prodId);
+    const pl = pr?.planos?.find(x=>x.id===planoId);
+    if(pl) await api.put('/api/produtos', {tipo:'plano', id: planoId, ...pl});
+  }
+};
+
+
+
+// ===== SYNC LEADS CRIAÇÃO =====
+
+// Override criarLeadDeEntrega to save to API
+const _origCriarLead = criarLeadDeEntrega;
+criarLeadDeEntrega = async function(pedido) {
+  _origCriarLead(pedido);
+  if(authToken) {
+    const lead = DB.leads[DB.leads.length-1];
+    if(lead) {
+      const result = await api.post('/api/leads', lead);
+      if(result && result.id) lead.id = result.id;
+    }
+  }
+};
+
+// Override confirmarNegociacao to save followup to API
+const _origConfirmarNegociacao = confirmarNegociacao;
+confirmarNegociacao = async function() {
+  _origConfirmarNegociacao();
+  if(authToken && kbActiveLead) {
+    const lead = DB.leads.find(l=>l.id===kbActiveLead);
+    if(lead) await api.put('/api/leads', lead);
+  }
+};
+
+// Override concluirFollowupLead to save to API
+const _origConcluirFollowupLead = concluirFollowupLead;
+concluirFollowupLead = async function(leadId) {
+  _origConcluirFollowupLead(leadId);
+  if(authToken) {
+    const lead = DB.leads.find(x=>x.id===leadId);
+    if(lead) await api.put('/api/leads', lead);
+  }
+};
+
+// Override confirmarPerdaExecutar to delete lead from API
+const _origConfirmarPerda = confirmarPerdaExecutar;
+confirmarPerdaExecutar = async function() {
+  const id = kbActiveLead;
+  _origConfirmarPerda();
+  if(authToken && id) await api.delete('/api/leads?id='+id);
+};
+
+
+
+// ===== SYNC USUARIOS EDIÇÃO =====
+
+// Override editarUsuario save button to use API
+const _origEditarUsuario = editarUsuario;
+editarUsuario = function(id) {
+  _origEditarUsuario(id);
+  // Override the update button to also call API
+  setTimeout(()=>{
+    const btn = document.querySelector('#modalUsuario .btn-primary');
+    if(btn && btn.textContent === 'Atualizar'){
+      const origOnclick = btn.onclick;
+      btn.onclick = async function() {
+        origOnclick();
+        if(authToken) {
+          const u = DB.users.find(x=>x.id===id);
+          if(u) {
+            const senha = document.getElementById('u_senha')?.value;
+            await api.put('/api/usuarios', {
+              id: u.id,
+              nome: u.nome,
+              email: u.email,
+              tipo: u.tipo,
+              vendedores: u.vendedores||[],
+              cobradores: u.cobradores||[],
+              ...(senha ? {senha} : {})
+            });
+          }
+        }
+      };
+    }
+  }, 100);
+};
+
+// Override deleteUser to delete from API
+const _origDeleteUser = deleteUser;
+deleteUser = async function(id) {
+  _origDeleteUser(id);
+  if(authToken) await api.delete('/api/usuarios?id='+id);
+};
+
+
+// ===== END API INTEGRATION =====
+
 // ===== DATA =====
 const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtDate = d => new Date(d).toLocaleDateString('pt-BR');
