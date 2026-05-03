@@ -7929,7 +7929,7 @@ function togglePedidoExpand(id, rowEl){
         <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirModalBoleto()">📄 Gerar Boleto</button>
         <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirLinkPayT(${p.id})">🔗 Link PayT</button>
         <button class="ped-expand-action-btn" onclick="event.stopPropagation();abrirPedido(${p.id})">✎ Editar</button>
-        <button class="ped-expand-action-btn red" onclick="event.stopPropagation();confirmarExcluirPedido(${p.id},this.dataset.nome)" data-nome="${p.nome.replace(/"/g,'&quot;')}">🗑 Excluir</button>
+        <button class="ped-expand-action-btn red" id="btn-del-${p.id}" onclick="event.stopPropagation();confirmarExcluirPedido(${p.id},this.dataset.nome)" data-nome="${p.nome.replace(/"/g,'&quot;')}" style="display:${currentUser.tipo==='ADMIN'?'inline-flex':'none'}">🗑 Excluir</button>
       </div>
       <!-- Body -->
       <div class="ped-expand-inner">
