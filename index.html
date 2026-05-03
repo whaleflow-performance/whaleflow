@@ -2522,16 +2522,20 @@ function stopPolling(){
 
 // Sync rastreamento
 async function syncRastreamento() {
-  const data = await api.get('/api/rastreamento');
-  if(data && Array.isArray(data)) {
-    DB.pedidos = data.map(r => ({
-      id: r.id,
-      cliente_nome: r.cliente_nome,
-      codigo_rastreio: r.codigo_rastreio,
-      status_entrega: r.status_entrega,
-      data_envio: r.data_envio,
-      ultima_atualizacao: r.ultima_atualizacao,
-    }));
+  try {
+    const data = await api.get('/api/rastreamento');
+    if(data && Array.isArray(data)) {
+      DB.pedidos = data.map(r => ({
+        id: r.id,
+        cliente_nome: r.cliente_nome,
+        codigo_rastreio: r.codigo_rastreio,
+        status_entrega: r.status_entrega,
+        data_envio: r.data_envio,
+        ultima_atualizacao: r.ultima_atualizacao,
+      }));
+    }
+  } catch(e) {
+    if(!Array.isArray(DB.pedidos)) DB.pedidos = [];
   }
 }
 
@@ -3144,8 +3148,9 @@ function renderAdminDash(){
   // ── FUNIL ─────────────────────────────────────────────────
   const funilEl = document.getElementById('funil_cobranca');
   if(funilEl){
-    const enviados   = DB.pedidos.filter(p=>['ENVIADO','SAIU'].includes(p.status_entrega)).length;
-    const entregues  = DB.pedidos.filter(p=>p.status_entrega==='ENTREGUE').length;
+    const _ped = Array.isArray(DB.pedidos)?DB.pedidos:[];
+    const enviados   = _ped.filter(p=>['ENVIADO','SAIU'].includes(p.status_entrega)).length;
+    const entregues  = _ped.filter(p=>p.status_entrega==='ENTREGUE').length;
     const emCob      = DB.leads.length;
     const base       = pedidos.length||1;
     const steps = [
@@ -4314,25 +4319,67 @@ function editarProdutoModal(id){
   const peEl=document.getElementById('prod_estoque'); if(peEl) peEl.checked=pr.estoque_controlado||false;
   openModal('modalProduto');
 }
-function saveProduto(){
-  const planoRows=document.querySelectorAll('[id^="plano-row-"]');
-  const planos=Array.from(planoRows).map((r,i)=>{
-    const rid=r.id.replace('plano-row-','');
-    const estVal = document.getElementById('pl_est_'+rid)?.value;
-    const comVal = document.getElementById('pl_com_'+rid)?.value;
-    return {id:DB.nextId++,nome:document.getElementById('pl_nome_'+rid).value,quantidade:parseInt(document.getElementById('pl_qtd_'+rid).value)||1,unidade:document.getElementById('pl_unidade_'+rid).value||'un',preco:parseFloat(document.getElementById('pl_preco_'+rid).value)||0,estoque:estVal!==''&&estVal!==undefined?parseInt(estVal):null,comissao_afil:comVal!==''&&comVal!==undefined?parseFloat(comVal):null};
-  }).filter(p=>p.nome);
-  const temEstoque = planos.some(p=>p.estoque!==null);
-  const pr={id:DB.nextId++,nome:document.getElementById('pr_nome').value,descricao:document.getElementById('pr_desc').value,categoria:document.getElementById('pr_categoria').value,status:document.getElementById('pr_status').value,estoque_controlado:temEstoque,planos};
+async function saveProduto(){
+  const nome = document.getElementById('pr_nome')?.value?.trim();
+  if(!nome){ alert('Informe o nome do produto.'); return; }
+
+  // Read plano rows - supports both id formats
+  const planos = [];
+  document.querySelectorAll('[id^="pn_nome_"]').forEach(el=>{
+    const rid = el.id.replace('pn_nome_','');
+    const pNome = el.value.trim();
+    const preco = parseFloat(document.getElementById('pn_preco_'+rid)?.value)||0;
+    const qtd   = parseInt(document.getElementById('pn_qtd_'+rid)?.value)||1;
+    if(pNome) planos.push({id:DB.nextId++, nome:pNome, preco, quantidade:qtd, unidade:'un', estoque:null});
+  });
+
+  const pr = {
+    id: DB.nextId++,
+    nome,
+    descricao: document.getElementById('pr_desc')?.value||'',
+    estoque_controlado: false,
+    planos
+  };
   DB.produtos.push(pr);
+
+  // Save to API
+  const token = authToken || localStorage.getItem('wf_token');
+  if(token){
+    try {
+      const r = await fetch('/api/produtos',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({tipo:'produto', nome:pr.nome, descricao:pr.descricao, estoque_controlado:false})
+      });
+      const rdata = await r.json();
+      if(rdata && rdata.id){
+        pr.id = rdata.id;
+        for(const pl of planos){
+          const rpl = await fetch('/api/produtos',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+            body: JSON.stringify({tipo:'plano', produto_id:rdata.id, nome:pl.nome, preco:pl.preco, quantidade:pl.quantidade, unidade:'un'})
+          });
+          const pldata = await rpl.json();
+          if(pldata && pldata.id) pl.id = pldata.id;
+        }
+      }
+    } catch(e){ console.error('Erro ao salvar produto:', e); }
+  }
+
   closeModal('modalProduto');
   document.getElementById('planosContainer').innerHTML='';
-  document.getElementById('pr_nome').value='';
-  document.getElementById('pr_desc').value='';
-  document.getElementById('pr_categoria').value='';
+  if(document.getElementById('pr_nome')) document.getElementById('pr_nome').value='';
+  if(document.getElementById('pr_desc')) document.getElementById('pr_desc').value='';
   renderProdutos();
 }
-function deleteProduto(id){DB.produtos=DB.produtos.filter(p=>p.id!==id);renderProdutos();}
+async function deletarProduto(id){
+  DB.produtos=DB.produtos.filter(p=>p.id!==id);
+  renderProdutos();
+  const token=authToken||localStorage.getItem('wf_token');
+  if(token) await fetch('/api/produtos?tipo=produto&id='+id,{method:'DELETE',headers:{'Authorization':'Bearer '+token}});
+}
+function deleteProduto(id){ deletarProduto(id); }
 function openEditProduto(id){alert('Edição de produto: em breve!');}
 
 
@@ -9129,6 +9176,27 @@ navigate = function(pageId){
   _origNavigate(pageId);
   if(window.innerWidth <= 768) closeMobileMenu();
 };
+
+
+
+function addPlanoRow(){
+  planoRowId++;
+  const container = document.getElementById('planosContainer');
+  if(!container) return;
+  const row = document.createElement('div');
+  row.id = 'plano_row_'+planoRowId;
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px';
+  row.innerHTML = `
+    <input placeholder="Nome do plano" id="pn_nome_${planoRowId}" style="height:34px;font-size:12px">
+    <div style="position:relative">
+      <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text3)">R$</span>
+      <input type="number" placeholder="0,00" id="pn_preco_${planoRowId}" step="0.01" style="height:34px;font-size:12px;padding-left:26px">
+    </div>
+    <input type="number" placeholder="Qtd" id="pn_qtd_${planoRowId}" style="height:34px;font-size:12px" value="1">
+    <button onclick="document.getElementById('plano_row_${planoRowId}').remove()" style="background:var(--red-bg);border:1px solid var(--red-bg);color:var(--red);border-radius:var(--radius);height:34px;width:34px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
+  `;
+  container.appendChild(row);
+}
 
 // ===== MODALS =====
 function openModal(id){
