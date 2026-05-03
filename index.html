@@ -3869,7 +3869,7 @@ function renderClientesPedidos(){
   if(currentUser.tipo==='ADMIN') base=DB.clientes_pedidos;
   else if(currentUser.tipo==='COBRADOR'){
     const vends=currentUser.vendedores||[];
-    base=DB.clientes_pedidos.filter(p=>vends.includes(p.vendedor_id));
+    base=DB.clientes_pedidos.filter(p=>vends.includes(p.vendedor_id) || p.vendedor_id===null || p.vendedor_id===undefined);
   } else base=DB.clientes_pedidos.filter(p=>p.vendedor_id===currentUser.id);
 
   // Vendedor filter
