@@ -8822,7 +8822,8 @@ async function salvarMeuPerfil(){
   btn.textContent='Salvando...'; btn.disabled=true;
 
   try {
-    const payload = { id: currentUser.id, nome, email, tipo: currentUser.tipo, vendedores: currentUser.vendedores||[], cobradores: currentUser.cobradores||[] };
+    const finalEmail = currentUser.tipo==='ADMIN' ? email : currentUser.email;
+    const payload = { id: currentUser.id, nome, email: finalEmail, tipo: currentUser.tipo, vendedores: currentUser.vendedores||[], cobradores: currentUser.cobradores||[] };
     if(nova) payload.senha = nova;
 
     if(typeof api !== 'undefined' && authToken){
@@ -9939,7 +9940,7 @@ document.getElementById('appWrap').style.display='none';
     <label>Nome</label>
     <input id="mp_nome" placeholder="Seu nome completo">
   </div>
-  <div class="form-group">
+  <div class="form-group" id="mp_email_group">
     <label>Email</label>
     <input type="email" id="mp_email" placeholder="seu@email.com">
   </div>
