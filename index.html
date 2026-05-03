@@ -7562,6 +7562,7 @@ async function salvarNovoPlano(){
     frete: parseFloat(document.getElementById('np_frete').value)||null,
     quantidade:1, unidade:'un', estoque:null, comissao_afil:null,
     inativo: document.getElementById('np_status').value==='inativo',
+    payt_checkout_id: document.getElementById('np_payt_id')?.value?.trim() || null,
   };
   pr.planos.push(plano);
 
@@ -7572,7 +7573,7 @@ async function salvarNovoPlano(){
       const r = await fetch('/api/produtos', {
         method: 'POST',
         headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
-        body: JSON.stringify({tipo:'plano', produto_id: prodId, nome: plano.nome, preco: plano.preco, custo_produto: plano.custo_produto, frete: plano.frete, quantidade:1, unidade:'un', inativo: plano.inativo||false})
+        body: JSON.stringify({tipo:'plano', produto_id: prodId, nome: plano.nome, preco: plano.preco, custo_produto: plano.custo_produto, frete: plano.frete, quantidade:1, unidade:'un', inativo: plano.inativo||false, payt_checkout_id: plano.payt_checkout_id||null})
       });
       const data = await r.json();
       if(data && data.id) plano.id = data.id;
@@ -7906,7 +7907,7 @@ function togglePedidoExpand(id, rowEl){
         <button class="ped-expand-action-btn green" onclick="event.stopPropagation();openModalPagarPedido(${p.id})">💲 Pagar</button>
         <button class="ped-expand-action-btn amber" onclick="event.stopPropagation();toggleSuspensaoPedido(${p.id})">⊘ Suspender</button>
         <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirModalBoleto()">📄 Gerar Boleto</button>
-        <button class="ped-expand-action-btn blue" onclick="event.stopPropagation()">🔗 Link PayT</button>
+        <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirLinkPayT(${p.id})">🔗 Link PayT</button>
         <button class="ped-expand-action-btn" onclick="event.stopPropagation();abrirPedido(${p.id})">✎ Editar</button>
         <button class="ped-expand-action-btn red" onclick="event.stopPropagation();confirmarExcluirPedido(${p.id},this.dataset.nome)" data-nome="${p.nome.replace(/"/g,'&quot;')}">🗑 Excluir</button>
       </div>
@@ -9107,6 +9108,46 @@ async function executarExcluirPedido(){
   await deleteClientePedido(id);
 }
 
+
+function abrirLinkPayT(pedidoId){
+  const p = DB.clientes_pedidos.find(x=>x.id===pedidoId);
+  if(!p){ alert('Pedido não encontrado.'); return; }
+
+  // Find checkout_id from plano
+  let checkoutId = '';
+  for(const prod of DB.produtos){
+    const plano = prod.planos?.find(pl=>pl.nome===p.plano_nome);
+    if(plano && plano.payt_checkout_id){
+      checkoutId = plano.payt_checkout_id;
+      break;
+    }
+  }
+
+  if(!checkoutId){
+    alert('Configure o Checkout ID do Payt no cadastro do plano "'+p.plano_nome+'" (aba Planos → editar → campo Payt Checkout ID).');
+    return;
+  }
+
+  // Clean and encode fields
+  const nome = encodeURIComponent((p.nome||'').trim());
+  const tel  = encodeURIComponent((p.tel||'').replace(/[^0-9]/g, ''));
+  
+  // Build address: rua, numero, bairro, cidade/UF, CEP
+  const addrParts = [
+    p.rua && p.numero ? `${p.rua}, ${p.numero}` : p.rua||'',
+    p.bairro||'',
+    p.cidade && p.uf ? `${p.cidade}/${p.uf}` : p.cidade||'',
+    p.cep ? `CEP ${(p.cep||'').replace(/[^0-9]/g,'')}` : ''
+  ].filter(Boolean).join(', ');
+  const addr = encodeURIComponent(addrParts.trim());
+
+  let url = `https://checkout.payt.com.br/${checkoutId}?name=${nome}`;
+  if(tel)  url += `&phone=${tel}`;
+  if(addr) url += `&address=${addr}`;
+
+  window.open(url, '_blank');
+}
+
 // ===== MODALS =====
 function openModal(id){
   document.getElementById(id).classList.add('open');
@@ -9167,7 +9208,7 @@ function closeModal(id){
   if(id==='modalNovoPlano'){
     const btn = document.querySelector('#modalNovoPlano .btn-primary');
     if(btn){ btn.textContent='Salvar'; btn.onclick=salvarNovoPlano; btn.disabled=false; }
-    ['np_nome','np_preco','np_custo','np_frete'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+    ['np_nome','np_preco','np_custo','np_frete','np_payt_id'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
     const sel=document.getElementById('np_produto'); if(sel) sel.value='';
     const st=document.getElementById('np_status'); if(st) st.value='ativo';
   }
@@ -9721,6 +9762,11 @@ document.getElementById('appWrap').style.display='none';
         <option value="inativo">Inativo</option>
       </select>
     </div>
+  </div>
+  <div class="form-group" style="margin-bottom:4px">
+    <label>Payt Checkout ID <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
+    <input id="np_payt_id" placeholder="Ex: e2a9357949811bf87116c93470031d72" style="font-family:monospace;font-size:12px">
+    <div style="font-size:11px;color:var(--text3);margin-top:3px">Parte final da URL do checkout Payt para este plano</div>
   </div>
   <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px">
     <button class="btn btn-ghost" onclick="closeModal('modalNovoPlano')">Cancelar</button>
