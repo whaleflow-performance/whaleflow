@@ -2272,7 +2272,14 @@ async function syncPedidos() {
       links: p.links || [],
       suspenso: p.suspenso || false,
     }));
-    renderClientesPedidos();
+    // Re-render active page
+    const active = document.querySelector('.page.active');
+    const pageId = active?.id?.replace('page-','');
+    if(pageId==='clientes-pedidos') renderClientesPedidos();
+    if(pageId==='dashboard' || pageId==='cobrador' || pageId==='vendedor') {
+      if(typeof renderAdminDash === 'function' && currentUser?.tipo==='ADMIN') renderAdminDash();
+      else if(typeof renderCobradorDash === 'function' && currentUser?.tipo==='COBRADOR') renderCobradorDash();
+    }
   }
 }
 
