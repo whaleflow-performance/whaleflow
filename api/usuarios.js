@@ -20,44 +20,68 @@ export default async function handler(req, res) {
   if (user.tipo !== 'ADMIN') return res.status(403).json({ error: 'Sem permissão' });
 
   try {
-    // GET - listar usuários
     if (req.method === 'GET') {
-      const users = await sql`SELECT id, nome, email, tipo, vendedores, cobradores, comissao_pct, created_at FROM usuarios ORDER BY nome`;
+      const users = await sql`
+        SELECT id, nome, email, tipo, vendedores, cobradores, comissao_pct, created_at 
+        FROM usuarios ORDER BY nome`;
       return res.status(200).json(users);
     }
 
-    // POST - criar usuário
     if (req.method === 'POST') {
       const u = req.body;
+      if (!u.nome || !u.email || !u.senha) {
+        return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+      }
       const hash = await bcrypt.hash(u.senha, 10);
       const result = await sql`
         INSERT INTO usuarios (nome, email, senha, tipo, vendedores, cobradores, comissao_pct)
-        VALUES (${u.nome}, ${u.email}, ${hash}, ${u.tipo},
-                ${JSON.stringify(u.vendedores||[])}::jsonb,
-                ${JSON.stringify(u.cobradores||[])}::jsonb,
-                ${u.comissao_pct||30})
+        VALUES (
+          ${u.nome}, ${u.email}, ${hash}, ${u.tipo || 'VENDEDOR'},
+          ${JSON.stringify(u.vendedores || [])}::jsonb,
+          ${JSON.stringify(u.cobradores || [])}::jsonb,
+          ${u.comissao_pct || 30}
+        )
         RETURNING id, nome, email, tipo, vendedores, cobradores, comissao_pct`;
       return res.status(201).json(result[0]);
     }
 
-    // PUT - atualizar usuário
     if (req.method === 'PUT') {
       const u = req.body;
       if (u.senha) {
         const hash = await bcrypt.hash(u.senha, 10);
-        await sql`UPDATE usuarios SET nome=${u.nome}, email=${u.email}, senha=${hash}, tipo=${u.tipo},
-          vendedores=${JSON.stringify(u.vendedores||[])}::jsonb,
-          cobradores=${JSON.stringify(u.cobradores||[])}::jsonb
-          WHERE id=${u.id}`;
+        await sql`
+          UPDATE usuarios SET 
+            nome = ${u.nome}, 
+            email = ${u.email}, 
+            senha = ${hash}, 
+            tipo = ${u.tipo},
+            vendedores = ${JSON.stringify(u.vendedores || [])}::jsonb,
+            cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb
+          WHERE id = ${u.id}`;
       } else {
-        await sql`UPDATE usuarios SET nome=${u.nome}, email=${u.email}, tipo=${u.tipo},
-          vendedores=${JSON.stringify(u.vendedores||[])}::jsonb,
-          cobradores=${JSON.stringify(u.cobradores||[])}::jsonb
-          WHERE id=${u.id}`;
+        await sql`
+          UPDATE usuarios SET 
+            nome = ${u.nome}, 
+            email = ${u.email}, 
+            tipo = ${u.tipo},
+            vendedores = ${JSON.stringify(u.vendedores || [])}::jsonb,
+            cobradores = ${JSON.stringify(u.cobradores || [])}::jsonb
+          WHERE id = ${u.id}`;
       }
       return res.status(200).json({ ok: true });
     }
 
-    // DELETE - remover usuário
     if (req.method === 'DELETE') {
-      cons
+      const { id } = req.query;
+      if (parseInt(id) === user.id) {
+        return res.status(400).json({ error: 'Não pode remover a si mesmo' });
+      }
+      await sql`DELETE FROM usuarios WHERE id = ${id}`;
+      return res.status(200).json({ ok: true });
+    }
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  }
+}
