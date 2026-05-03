@@ -61,6 +61,7 @@ export async function setupDB() {
       pagamento TEXT DEFAULT 'PENDENTE',
       forma_pagamento TEXT,
       vendedor_id INTEGER,
+      cobrador_id INTEGER,
       obs TEXT,
       data DATE DEFAULT CURRENT_DATE,
       notas JSONB DEFAULT '[]',
@@ -116,9 +117,20 @@ export async function setupDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS config (
+      chave TEXT PRIMARY KEY,
+      valor TEXT
+    )`;
+
   await sql`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
+  await sql`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS cobrador_id INTEGER`;
   await sql`ALTER TABLE rastreamentos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
   await sql`ALTER TABLE planos ADD COLUMN IF NOT EXISTS payt_checkout_id TEXT`;
+
+  await sql`
+    INSERT INTO config (chave, valor) VALUES ('ultimo_cobrador_idx', '0')
+    ON CONFLICT (chave) DO NOTHING`;
 
   return true;
 }
