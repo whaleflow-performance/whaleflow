@@ -68,6 +68,7 @@ export async function setupDB() {
       followup_obs TEXT,
       followup_concluido BOOLEAN DEFAULT FALSE,
       comprovante JSONB,
+      id_externo TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     )`;
 
@@ -112,6 +113,10 @@ export async function setupDB() {
       ultima_atualizacao DATE DEFAULT CURRENT_DATE,
       created_at TIMESTAMP DEFAULT NOW()
     )`;
+
+  // Add id_externo column if not exists (migration)
+  await sql`
+    ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
 
   return true;
 }
