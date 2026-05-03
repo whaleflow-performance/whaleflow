@@ -7603,9 +7603,28 @@ function editarPlano(prodId, planoId){
   document.getElementById('np_custo').value = pl.custo_produto||'';
   document.getElementById('np_frete').value = pl.frete||'';
   document.getElementById('np_status').value = pl.inativo?'inativo':'ativo';
+  const paytEl = document.getElementById('np_payt_id');
+  if(paytEl) paytEl.value = pl.payt_checkout_id||'';
   // Change save button to update
   const btn = document.querySelector('#modalNovoPlano .btn-primary');
-  if(btn){ btn.textContent='Atualizar'; btn.onclick=()=>{ pl.nome=document.getElementById('np_nome').value; pl.preco=parseFloat(document.getElementById('np_preco').value)||0; pl.custo_produto=parseFloat(document.getElementById('np_custo').value)||null; pl.frete=parseFloat(document.getElementById('np_frete').value)||null; pl.inativo=document.getElementById('np_status').value==='inativo'; closeModal('modalNovoPlano'); renderPlanos(); btn.textContent='Salvar'; btn.onclick=salvarNovoPlano; }; }
+  if(btn){ btn.textContent='Atualizar'; btn.onclick=async()=>{
+    pl.nome = document.getElementById('np_nome').value;
+    pl.preco = parseFloat(document.getElementById('np_preco').value)||0;
+    pl.custo_produto = parseFloat(document.getElementById('np_custo').value)||null;
+    pl.frete = parseFloat(document.getElementById('np_frete').value)||null;
+    pl.inativo = document.getElementById('np_status').value==='inativo';
+    pl.payt_checkout_id = document.getElementById('np_payt_id')?.value?.trim()||null;
+    // Save to API
+    const token = authToken||localStorage.getItem('wf_token');
+    if(token){
+      try {
+        await fetch('/api/produtos',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({tipo:'plano',id:pl.id,nome:pl.nome,preco:pl.preco,custo_produto:pl.custo_produto,frete:pl.frete,inativo:pl.inativo,payt_checkout_id:pl.payt_checkout_id})});
+      } catch(e){ console.error(e); }
+    }
+    closeModal('modalNovoPlano');
+    renderPlanos();
+    btn.textContent='Salvar'; btn.onclick=salvarNovoPlano;
+  }; }
   openModal('modalNovoPlano');
 }
 
