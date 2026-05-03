@@ -2882,7 +2882,14 @@ function setupSidebar(){
   const initials=currentUser.nome.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const colors={ADMIN:'var(--blue)',COBRADOR:'var(--purple)',VENDEDOR:'var(--green)',AFILIADO:'#e879f9'};
   const bgs={ADMIN:'var(--blue-bg)',COBRADOR:'var(--purple-bg)',VENDEDOR:'var(--green-bg)',AFILIADO:'var(--purple-bg)'};
-  document.getElementById('sidebarAvatar').textContent=initials;
+  const savEl=document.getElementById('sidebarAvatar');
+  const savedFoto=currentUser?.foto||localStorage.getItem('foto_'+currentUser?.id);
+  if(savedFoto && savEl){
+    savEl.innerHTML=`<img src='${savedFoto}' style='width:100%;height:100%;object-fit:cover;border-radius:50%'>`;
+    savEl.style.padding='0';
+  } else {
+    if(savEl) savEl.textContent=initials;
+  }
   document.getElementById('sidebarAvatar').style.background=bgs[currentUser.tipo];
   document.getElementById('sidebarAvatar').style.color=colors[currentUser.tipo];
   document.getElementById('sidebarName').textContent=currentUser.nome;
@@ -8830,16 +8837,28 @@ async function salvarMeuPerfil(){
       await api.put('/api/usuarios', payload);
     }
 
+    // Save photo locally
+    if(mpFotoBase64){
+      currentUser.foto = mpFotoBase64;
+      localStorage.setItem('foto_'+currentUser.id, mpFotoBase64);
+    }
+
     // Update local
     currentUser.nome  = nome;
-    currentUser.email = email;
+    currentUser.email = finalEmail;
     localStorage.setItem('wf_user', JSON.stringify(currentUser));
     const u = DB.users.find(x=>x.id===currentUser.id);
     if(u){ u.nome=nome; u.email=email; }
 
     // Update sidebar
     document.getElementById('sidebarName').textContent = nome;
-    document.getElementById('sidebarAvatar').textContent = nome.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const newInit = nome.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const sav = document.getElementById('sidebarAvatar');
+    if(mpFotoBase64 && sav){
+      sav.innerHTML=`<img src='${mpFotoBase64}' style='width:100%;height:100%;object-fit:cover;border-radius:50%'>`;
+      sav.style.padding='0';
+    } else if(sav) { sav.textContent=newInit; }
+    updateSidebarFoto();
 
     msg.style.display='block'; msg.style.color='var(--green)'; msg.textContent='✓ Perfil atualizado com sucesso!';
     btn.textContent='Salvar'; btn.disabled=false;
@@ -8847,6 +8866,42 @@ async function salvarMeuPerfil(){
   } catch(e){
     msg.style.display='block'; msg.style.color='var(--red)'; msg.textContent='Erro ao salvar. Tente novamente.';
     btn.textContent='Salvar'; btn.disabled=false;
+  }
+}
+
+
+let mpFotoBase64 = null;
+
+function previewFotoPerfil(input){
+  if(!input.files||!input.files[0]) return;
+  const file = input.files[0];
+  if(file.size > 500000){ alert('Foto muito grande! Use uma imagem menor que 500KB.'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    mpFotoBase64 = e.target.result;
+    const av = document.getElementById('mp_avatar');
+    if(av){
+      av.innerHTML = `<img src="${mpFotoBase64}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`;
+    }
+    // Also update sidebar avatar preview
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadFotoPerfil(){
+  const foto = currentUser?.foto || localStorage.getItem('foto_'+currentUser?.id);
+  const av = document.getElementById('mp_avatar');
+  if(foto && av){
+    av.innerHTML = `<img src="${foto}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`;
+  }
+}
+
+function updateSidebarFoto(){
+  const foto = currentUser?.foto || localStorage.getItem('foto_'+currentUser?.id);
+  const sav = document.getElementById('sidebarAvatar');
+  if(foto && sav){
+    sav.innerHTML = `<img src="${foto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    sav.style.padding = '0';
   }
 }
 
@@ -9928,11 +9983,18 @@ document.getElementById('appWrap').style.display='none';
 
   <!-- Avatar + info -->
   <div style="display:flex;align-items:center;gap:14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px">
-    <div style="width:48px;height:48px;border-radius:12px;background:var(--blue-bg);border:2px solid var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--blue)" id="mp_avatar">AD</div>
-    <div>
+    <div style="position:relative;cursor:pointer" onclick="document.getElementById('mp_foto_input').click()" title="Trocar foto">
+      <div style="width:56px;height:56px;border-radius:12px;background:var(--blue-bg);border:2px solid var(--blue);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--blue);overflow:hidden;flex-shrink:0" id="mp_avatar">AD</div>
+      <div style="position:absolute;bottom:-4px;right:-4px;width:20px;height:20px;border-radius:50%;background:var(--bg2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </div>
+      <input type="file" id="mp_foto_input" accept="image/*" style="display:none" onchange="previewFotoPerfil(this)">
+    </div>
+    <div style="flex:1;min-width:0">
       <div style="font-size:14px;font-weight:700;color:var(--text)" id="mp_nome_display">—</div>
       <div style="font-size:12px;color:var(--text3)" id="mp_email_display">—</div>
       <div style="font-size:11px;font-weight:600;margin-top:3px" id="mp_tipo_display">—</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px">Clique na foto para alterar</div>
     </div>
   </div>
 
