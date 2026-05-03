@@ -1047,7 +1047,7 @@ select option{background:var(--bg2)}
           <div><div style="font-size:11px;color:var(--text3);margin-bottom:3px">Nome</div><div style="font-size:13px;font-weight:500;color:var(--text)" id="dp_nome"></div></div>
           <div><div style="font-size:11px;color:var(--text3);margin-bottom:3px">CPF</div><div style="font-size:13px;font-family:monospace;color:var(--text)" id="dp_cpf"></div></div>
           <div><div style="font-size:11px;color:var(--text3);margin-bottom:3px">Email</div><div style="font-size:13px;color:var(--blue)" id="dp_email"></div></div>
-          <div><div style="font-size:11px;color:var(--text3);margin-bottom:3px">Telefone</div><div style="font-size:13px;color:var(--text)" id="dp_tel"></div></div>
+          <div><div style="font-size:11px;color:var(--text3);margin-bottom:3px">Telefone</div><div style="font-size:13px;color:var(--blue);cursor:pointer" id="dp_tel" onclick="const t=this.textContent.replace(/\D/g,'');if(t)window.open('https://wa.me/55'+t,'_blank')"></div></div>
         </div>
       </div>
 
@@ -4236,7 +4236,9 @@ function abrirPedido(id){
   document.getElementById('dp_nome').textContent = p.nome || '—';
   document.getElementById('dp_cpf').textContent = p.cpf || '—';
   document.getElementById('dp_email').textContent = p.email || '—';
-  document.getElementById('dp_tel').textContent = p.tel || '—';
+  const telRaw = (p.tel||'').replace(/\D/g,'');
+  const telFmt = telRaw.length===11 ? `(${telRaw.slice(0,2)}) ${telRaw.slice(2,7)}-${telRaw.slice(7)}` : telRaw.length===10 ? `(${telRaw.slice(0,2)}) ${telRaw.slice(2,6)}-${telRaw.slice(6)}` : p.tel||'—';
+  document.getElementById('dp_tel').textContent = telFmt;
   document.getElementById('dp_rua').textContent = (p.rua||'') + (p.numero ? ', '+p.numero : '');
   document.getElementById('dp_bairro').textContent = p.bairro || '—';
   document.getElementById('dp_cep').textContent = p.cep || '—';
