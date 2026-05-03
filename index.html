@@ -3076,24 +3076,20 @@ function renderAdminDash(){
     }).join('') : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">Nenhum pagamento</div>';
   }
 
-  renderLineChart(dashDe, dashAte);
+  renderLineChart();
   renderDonutChart(totalPaid, totalSched, totalOpen, pixPed, bolPed, carPed);
   updateAprovacoesBadge();
   updateFollowupBadge();
 }
-function renderLineChart(de, ate){
+function renderLineChart(){
   const ctx=document.getElementById('chartLine')?.getContext('2d');
   if(!ctx) return;
   if(chartLine) chartLine.destroy();
 
-  // Build date range from period
+  // Always show last 7 days
   const hoje = new Date();
-  const startDate = de ? new Date(de) : new Date(hoje.getTime() - 6*86400000);
-  const endDate   = ate ? new Date(ate) : hoje;
-
-  // Limit to max 30 days for readability
-  const diffDays = Math.round((endDate-startDate)/86400000)+1;
-  const maxDays = Math.min(diffDays, 30);
+  const endDate = hoje;
+  const maxDays = 7;
 
   const labels = [];
   const dataAgendado = [];
