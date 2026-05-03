@@ -9184,9 +9184,9 @@ function abrirLinkPayT(pedidoId){
   if(p.nome)    params.set('full_name', p.nome.trim());
   if(p.cpf)     params.set('document', p.cpf.replace(/\D/g,''));
   if(p.tel)     params.set('phone', p.tel.replace(/\D/g,''));
-  if(p.cep)     params.set('zipcode', p.cep.replace(/\D/g,'').replace(/(\d{5})(\d{3})/, '$1-$2'));
+  if(p.cep)     params.set('zipcode', (p.cep||'').replace(/\D/g,'').replace(/(\d{5})(\d{3})/, '$1-$2'));
   if(p.rua)     params.set('street', p.rua);
-  if(p.numero)  params.set('number_address', p.numero);
+  if(p.numero)  params.set('number_address', (p.numero||'').replace(/[^0-9a-zA-Z\s]/g,'').trim());
   if(p.bairro)  params.set('neighborhood', p.bairro);
   if(p.complemento) params.set('complement', p.complemento);
   if(p.cidade)  params.set('city', p.cidade);
