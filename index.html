@@ -8893,7 +8893,9 @@ async function salvarMeuPerfil(){
   const msg   = document.getElementById('mp_msg');
   const btn   = document.getElementById('mp_save_btn');
 
-  if(!nome||!email){ msg.style.display='block'; msg.style.color='var(--red)'; msg.textContent='Preencha nome e email.'; return; }
+  // Use current values if fields are empty
+  if(!nome) nome = currentUser.nome || '';
+  if(!email) email = currentUser.email || '';
   if(nova && nova!==conf){ msg.style.display='block'; msg.style.color='var(--red)'; msg.textContent='As senhas não coincidem.'; return; }
 
   btn.textContent='Salvando...'; btn.disabled=true;
