@@ -1024,7 +1024,7 @@ select option{background:var(--bg2)}
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
               Link Pagamento
             </button>
-            <button class="btn btn-ghost btn-sm" onclick="abrirModalBoleto()" style="color:var(--amber);border-color:var(--amber-bg)">
+            <button class="btn btn-ghost btn-sm" onclick="confirmarGerarBoleto(pedidoAtivoId)" style="color:var(--amber);border-color:var(--amber-bg)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
               Gerar Boleto
             </button>
@@ -4283,7 +4283,7 @@ function renderStatusBadge(p){
   const bar = document.getElementById('dp_suspended_bar');
   const btn = document.getElementById('dp_btn_suspender');
   if(btn) btn.style.display = currentUser.tipo === 'COBRADOR' ? 'none' : 'inline-flex';
-  const boletoBtn = document.querySelector('button[onclick="abrirModalBoleto()"]');
+  const boletoBtn = document.querySelector('button[onclick="confirmarGerarBoleto(pedidoAtivoId)"]');
   if(boletoBtn) boletoBtn.style.display = currentUser.tipo === 'AFILIADO' ? 'none' : 'inline-flex';
   if(p.suspenso){
     badge.innerHTML = '<span class="tag tag-risco">Suspenso</span>';
@@ -7953,7 +7953,7 @@ function togglePedidoExpand(id, rowEl){
         <button class="ped-expand-action-btn" onclick="event.stopPropagation();editarStatusExpand(${p.id})">✎ Editar Status</button>
         <button class="ped-expand-action-btn green" onclick="event.stopPropagation();openModalPagarPedido(${p.id})">💲 Pagar</button>
         <button class="ped-expand-action-btn amber" onclick="event.stopPropagation();toggleSuspensaoPedido(${p.id})">⊘ Suspender</button>
-        <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirModalBoleto()">📄 Gerar Boleto</button>
+        <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();confirmarGerarBoleto(${p.id})">📄 Gerar Boleto</button>
         <button class="ped-expand-action-btn blue" onclick="event.stopPropagation();abrirLinkPayT(${p.id})">🔗 Link PayT</button>
         <button class="ped-expand-action-btn" onclick="event.stopPropagation();abrirPedido(${p.id})">✎ Editar</button>
         <button class="ped-expand-action-btn red" id="btn-del-${p.id}" onclick="event.stopPropagation();confirmarExcluirPedido(${p.id},this.dataset.nome)" data-nome="${p.nome.replace(/"/g,'&quot;')}" style="display:${currentUser.tipo==='ADMIN'?'inline-flex':'none'}">🗑 Excluir</button>
@@ -9240,6 +9240,24 @@ function toggleUserMenu(){
   openModal('modalMeuPerfil');
 }
 
+
+function confirmarGerarBoleto(pedidoId){
+  const p = DB.clientes_pedidos.find(x=>x.id===pedidoId);
+  if(!p) return;
+  document.getElementById('confirm_boleto_nome').textContent = p.nome;
+  // Store pedidoId for executarGerarBoleto
+  document.getElementById('modalConfirmarBoleto').dataset.pedidoId = pedidoId;
+  openModal('modalConfirmarBoleto');
+}
+
+function executarGerarBoleto(){
+  const pedidoId = parseInt(document.getElementById('modalConfirmarBoleto').dataset.pedidoId);
+  closeModal('modalConfirmarBoleto');
+  // Call existing boleto generation
+  pedidoAtivoId = pedidoId;
+  abrirModalBoleto();
+}
+
 // ===== MODALS =====
 function openModal(id){
   document.getElementById(id).classList.add('open');
@@ -10418,6 +10436,31 @@ document.getElementById('appWrap').style.display='none';
   <div style="display:flex;gap:10px;justify-content:flex-end">
     <button class="btn btn-ghost" onclick="closeModal('modalExcluirPedido')">Cancelar</button>
     <button class="btn" style="background:var(--red);color:#fff;border-color:var(--red);border-radius:6px" onclick="executarExcluirPedido()">Excluir</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL: CONFIRMAR GERAR BOLETO -->
+<div class="modal-overlay" id="modalConfirmarBoleto">
+<div class="modal" style="width:400px">
+  <div class="modal-title">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:30px;height:30px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      Gerar Boleto
+    </div>
+    <button class="modal-close" onclick="closeModal('modalConfirmarBoleto')">×</button>
+  </div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:6px">
+    Deseja gerar um boleto para <strong id="confirm_boleto_nome" style="color:var(--text)">—</strong>?
+  </div>
+  <div style="font-size:12px;color:var(--text3);background:var(--blue-bg);border:1px solid rgba(79,124,255,.2);border-radius:var(--radius);padding:10px 12px;margin-bottom:16px">
+    💡 Cada boleto gerado é cobrado pelo Cora. Confirme apenas quando for enviar ao cliente.
+  </div>
+  <div style="display:flex;gap:10px;justify-content:flex-end">
+    <button class="btn btn-ghost" onclick="closeModal('modalConfirmarBoleto')">Cancelar</button>
+    <button class="btn btn-primary" onclick="executarGerarBoleto()">Gerar Boleto</button>
   </div>
 </div>
 </div>
