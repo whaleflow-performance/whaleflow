@@ -2984,18 +2984,25 @@ function renderAdminDash(){
   // ── FUNIL ─────────────────────────────────────────────────
   const funilEl = document.getElementById('funil_cobranca');
   if(funilEl){
+    // Use rastreamentos from DB.pedidos (rastreamento table)
     const _ped = Array.isArray(DB.pedidos)?DB.pedidos:[];
-    const enviados   = _ped.filter(p=>['ENVIADO','SAIU'].includes(p.status_entrega)).length;
-    const entregues  = _ped.filter(p=>p.status_entrega==='ENTREGUE').length;
-    const emCob      = DB.leads.length;
-    const base       = pedidos.length||1;
+    const todosRastr    = DB.clientes_pedidos.length;
+    const enviados      = _ped.filter(p=>['ENVIADO','SAIU'].includes(p.status_entrega)).length;
+    const entregues     = _ped.filter(p=>p.status_entrega==='ENTREGUE').length;
+    const retirar       = _ped.filter(p=>p.status_entrega==='RETIRAR').length;
+    const emCob         = DB.leads.filter(l=>l.status_pipeline!=='PERDIDO').length;
+    const pagosTotal    = DB.clientes_pedidos.filter(p=>p.pagamento==='PAGO').length;
+    const agendados     = DB.clientes_pedidos.filter(p=>['PENDENTE','ANALISE'].includes(p.pagamento)).length; // todos pendentes
+    const base          = todosRastr||1;
     const steps = [
-      {n:1,label:'Pedidos confirmados',    val:pedidos.length,  pct:100,                           cor:'#4f7cff'},
-      {n:2,label:'Em trânsito / enviados', val:enviados,        pct:Math.round(enviados/base*100),  cor:'#22d3ee'},
-      {n:3,label:'Produto entregue',       val:entregues,       pct:Math.round(entregues/base*100), cor:'#a78bfa'},
-      {n:4,label:'Em cobrança',            val:emCob,           pct:Math.round(emCob/base*100),     cor:'#f5a623'},
-      {n:5,label:'Pagamento confirmado',   val:paid.length,     pct:Math.round(paid.length/base*100),cor:'#3ecf8e'},
-      {n:6,label:'Frustrados',             val:frustr.length,   pct:Math.round(frustr.length/base*100),cor:'#f56565'},
+      {n:1, label:'Pedidos Agendados',      val:agendados,    pct:100,   cor:'#4f7cff'},
+      {n:2, label:'Em Trânsito / Enviados', val:enviados,     pct:Math.round(enviados/base*100),    cor:'#22d3ee'},
+      {n:3, label:'Saiu p/ Entrega',        val:_ped.filter(p=>p.status_entrega==='SAIU').length, pct:Math.round(_ped.filter(p=>p.status_entrega==='SAIU').length/base*100), cor:'#a78bfa'},
+      {n:4, label:'Produto Entregue',       val:entregues,    pct:Math.round(entregues/base*100),   cor:'#f5a623'},
+      {n:5, label:'Retirar nos Correios',   val:retirar,      pct:Math.round(retirar/base*100),     cor:'#e879f9'},
+      {n:6, label:'Em Cobrança',            val:emCob,        pct:Math.round(emCob/base*100),       cor:'#f5a623'},
+      {n:7, label:'Pagamento Confirmado',   val:pagosTotal,   pct:Math.round(pagosTotal/base*100),  cor:'#3ecf8e'},
+      {n:8, label:'Frustrados',             val:frustr.length,pct:Math.round(frustr.length/base*100),cor:'#f56565'},
     ];
     funilEl.innerHTML = steps.map(s=>`
       <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
@@ -3062,23 +3069,31 @@ function renderAdminDash(){
     }).join('') : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">Nenhum pagamento</div>';
   }
 
-  renderLineChart();
+  renderLineChart(dashDe, dashAte);
   renderDonutChart(totalPaid, totalSched, totalOpen, pixPed, bolPed, carPed);
   updateAprovacoesBadge();
   updateFollowupBadge();
 }
-function renderLineChart(){
+function renderLineChart(de, ate){
   const ctx=document.getElementById('chartLine')?.getContext('2d');
   if(!ctx) return;
   if(chartLine) chartLine.destroy();
 
+  // Build date range from period
   const hoje = new Date();
+  const startDate = de ? new Date(de) : new Date(hoje.getTime() - 6*86400000);
+  const endDate   = ate ? new Date(ate) : hoje;
+
+  // Limit to max 30 days for readability
+  const diffDays = Math.round((endDate-startDate)/86400000)+1;
+  const maxDays = Math.min(diffDays, 30);
+
   const labels = [];
   const dataAgendado = [];
   const dataAprovado = [];
 
-  for(let i=6; i>=0; i--){
-    const d = new Date(hoje);
+  for(let i=maxDays-1; i>=0; i--){
+    const d = new Date(endDate);
     d.setDate(d.getDate()-i);
     const dateStr = d.toISOString().split('T')[0];
     const label = d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
