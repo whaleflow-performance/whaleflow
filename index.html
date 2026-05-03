@@ -2885,15 +2885,18 @@ function renderAdminDash(){
   const dashDe  = document.getElementById('dash_data_de')?.value  || hoje;
   const dashAte = document.getElementById('dash_data_ate')?.value || hoje;
 
-  // Filter vendas by period
-  const vendas     = DB.vendas;
-  const vendasPer  = vendas.filter(v=>(!dashDe||v.data_criacao>=dashDe)&&(!dashAte||v.data_criacao<=dashAte));
-  const paid       = vendasPer.filter(v=>v.status==='PAGO');
-  const sched      = vendasPer.filter(v=>v.status==='AGENDADO');
-  const openV      = vendasPer.filter(v=>v.status==='ABERTO');
-  const totalPaid  = paid.reduce((a,v)=>a+v.valor,0);
-  const totalSched = sched.reduce((a,v)=>a+v.valor,0);
-  const totalOpen  = openV.reduce((a,v)=>a+v.valor,0);
+  // Use clientes_pedidos as source of truth
+  const pedidosPer = DB.clientes_pedidos.filter(p=>(!dashDe||p.data>=dashDe)&&(!dashAte||p.data<=dashAte));
+  // Agendado = PENDENTE ou ANALISE (ainda nao pago, entregue ou nao)
+  const sched      = pedidosPer.filter(p=>['PENDENTE','ANALISE'].includes(p.pagamento));
+  // Pago = PAGO
+  const paid       = pedidosPer.filter(p=>p.pagamento==='PAGO');
+  const openV      = pedidosPer.filter(p=>p.pagamento==='PENDENTE');
+  const totalPaid  = paid.reduce((a,p)=>a+(parseFloat(p.plano_preco)||0),0);
+  const totalSched = sched.reduce((a,p)=>a+(parseFloat(p.plano_preco)||0),0);
+  const totalOpen  = openV.reduce((a,p)=>a+(parseFloat(p.plano_preco)||0),0);
+  // Cobrança pendente = entregues nao pagos (no kanban)
+  const cobPendLeads = DB.leads.filter(l=>!['PERDIDO'].includes(l.status_pipeline));
   const ticket     = paid.length ? totalPaid/paid.length : 0;
   const ticketSched= sched.length ? totalSched/sched.length : 0;
   const taxaConv   = sched.length ? (paid.length/sched.length*100).toFixed(1) : '0,0';
@@ -2902,7 +2905,7 @@ function renderAdminDash(){
   // Filter pedidos
   const pedidos    = DB.clientes_pedidos.filter(p=>(!dashDe||p.data>=dashDe)&&(!dashAte||p.data<=dashAte));
   const pedPago    = pedidos.filter(p=>p.pagamento==='PAGO');
-  const cobPend    = pedidos.filter(p=>['PENDENTE','ANALISE'].includes(p.pagamento));
+  const cobPend    = DB.leads.filter(l=>l.status_pipeline!=='PERDIDO');
   const frustr     = DB.frustracoes.filter(f=>(!dashDe||f.data>=dashDe)&&(!dashAte||f.data<=dashAte));
 
   // Period label
@@ -7785,17 +7788,33 @@ function renderIntegracoes(){
   // Outras
   const og = document.getElementById('integ_outras_grid');
   if(og){
-    if(!DB.integracoes.custom||!DB.integracoes.custom.length){
-      og.innerHTML='<div style="grid-column:1/-1;padding:32px;text-align:center;font-size:13px;color:var(--text3)">Nenhuma integração personalizada cadastrada.</div>';
+    const allOutras = [...(DB.integracoes.outras||[]), ...(DB.integracoes.custom||[])];
+    if(!allOutras.length){
+      og.innerHTML='<div style="grid-column:1/-1;padding:32px;text-align:center;font-size:13px;color:var(--text3)">Nenhuma integração cadastrada.</div>';
     } else {
-      og.innerHTML = DB.integracoes.custom.map(c=>`
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px">
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">${c.nome}</div>
-          ${c.url?`<div style="font-size:11px;font-family:monospace;color:var(--blue);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.url}</div>`:''}
-          <div style="font-size:11px;color:var(--text3)">${c.apikey_out?'API Key configurada':'Sem API Key'}</div>
+      og.innerHTML = allOutras.map(c=>`
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <div style="width:40px;height:40px;border-radius:10px;background:${c.cor||'var(--blue)'}22;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${c.icon||'🔗'}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;color:var(--text)">${c.nome}</div>
+              <div style="font-size:11px;color:var(--text3)">${c.sub||''}</div>
+            </div>
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${c.ativo?'var(--green-bg)':'var(--bg3)'};color:${c.ativo?'var(--green)':'var(--text3)'}">${c.ativo?'Ativo':'Inativo'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${c.funcionalidade||''}</div>
+          ${c.webhook_url?`
+          <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:4px">URL DO WEBHOOK</div>
+          <div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:10px">
+            <span style="font-size:11px;font-family:monospace;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.webhook_url}</span>
+            <button onclick="copiarTexto('${c.webhook_url}')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:0;flex-shrink:0" title="Copiar URL">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">Eventos: ${(c.eventos||[]).join(', ')}</div>
+          `:''}
         </div>`).join('');
-    }
-  }
+    }}
 }
 
 function salvarNovaIntegracao(){
