@@ -9163,22 +9163,19 @@ function abrirLinkPayT(pedidoId){
     return;
   }
 
-  // Clean and encode fields
-  const nome = encodeURIComponent((p.nome||'').trim());
-  const tel  = encodeURIComponent((p.tel||'').replace(/[^0-9]/g, ''));
-  
-  // Build address: rua, numero, bairro, cidade/UF, CEP
-  const addrParts = [
-    p.rua && p.numero ? `${p.rua}, ${p.numero}` : p.rua||'',
-    p.bairro||'',
-    p.cidade && p.uf ? `${p.cidade}/${p.uf}` : p.cidade||'',
-    p.cep ? `CEP ${(p.cep||'').replace(/[^0-9]/g,'')}` : ''
-  ].filter(Boolean).join(', ');
-  const addr = encodeURIComponent(addrParts.trim());
+  // Build URL with correct Payt parameters
+  const params = new URLSearchParams();
+  if(p.nome)    params.set('full_name', p.nome.trim());
+  if(p.cpf)     params.set('document', p.cpf.replace(/\D/g,''));
+  if(p.tel)     params.set('phone', p.tel.replace(/\D/g,''));
+  if(p.cep)     params.set('zipcode', p.cep.replace(/\D/g,'').replace(/(\d{5})(\d{3})/, '$1-$2'));
+  if(p.rua)     params.set('street', p.rua);
+  if(p.numero)  params.set('number_address', p.numero);
+  if(p.bairro)  params.set('neighborhood', p.bairro);
+  if(p.complemento) params.set('complement', p.complemento);
+  if(p.cidade)  params.set('city', p.cidade);
 
-  let url = `https://checkout.payt.com.br/${checkoutId}?name=${nome}`;
-  if(tel)  url += `&phone=${tel}`;
-  if(addr) url += `&address=${addr}`;
+  const url = `https://checkout.payt.com.br/${checkoutId}?${params.toString()}`;
 
   // Copy to clipboard instead of opening
   navigator.clipboard.writeText(url).then(()=>{
