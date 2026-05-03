@@ -111,12 +111,12 @@ export async function setupDB() {
       status_entrega TEXT DEFAULT 'PENDENTE',
       data_envio DATE,
       ultima_atualizacao DATE DEFAULT CURRENT_DATE,
+      id_externo TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     )`;
 
-  // Add id_externo column if not exists (migration)
-  await sql`
-    ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
+  await sql`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
+  await sql`ALTER TABLE rastreamentos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
 
   return true;
 }
