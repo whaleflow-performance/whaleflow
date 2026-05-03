@@ -38,6 +38,7 @@ export async function setupDB() {
       custo_produto NUMERIC,
       frete NUMERIC,
       inativo BOOLEAN DEFAULT FALSE,
+      payt_checkout_id TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     )`;
 
@@ -117,6 +118,7 @@ export async function setupDB() {
 
   await sql`ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
   await sql`ALTER TABLE rastreamentos ADD COLUMN IF NOT EXISTS id_externo TEXT`;
+  await sql`ALTER TABLE planos ADD COLUMN IF NOT EXISTS payt_checkout_id TEXT`;
 
   return true;
 }
