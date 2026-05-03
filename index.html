@@ -2622,159 +2622,6 @@ startPolling = function() {
 
 
 
-// ===== SYNC PRODUTOS E PLANOS =====
-
-// Override saveProduto to save to API
-const _origSaveProduto = saveProduto;
-saveProduto = async function() {
-  const nome = document.getElementById('prod_nome')?.value?.trim();
-  if(!nome) return;
-  
-  _origSaveProduto();
-  
-  if(authToken) {
-    const last = DB.produtos[DB.produtos.length-1];
-    // Save produto
-    const result = await api.post('/api/produtos', {tipo:'produto', nome: last.nome, descricao: last.descricao||'', estoque_controlado: last.estoque_controlado||false});
-    if(result && result.id) {
-      last._dbId = result.id;
-      // Save each plano
-      for(const pl of last.planos||[]) {
-        const rpl = await api.post('/api/produtos', {tipo:'plano', produto_id: result.id, ...pl});
-        if(rpl && rpl.id) pl._dbId = rpl.id;
-      }
-    }
-  }
-};
-
-// Override deletarProduto to delete from API
-const _origDeletarProduto = deletarProduto;
-deletarProduto = async function(id) {
-  _origDeletarProduto(id);
-  if(authToken) await api.delete('/api/produtos?tipo=produto&id='+id);
-};
-
-// Override deletarPlano to delete from API
-const _origDeletarPlano = deletarPlano;
-deletarPlano = async function(prodId, planoId) {
-  _origDeletarPlano(prodId, planoId);
-  if(authToken) await api.delete('/api/produtos?tipo=plano&id='+planoId);
-};
-
-// Override salvarNovoPlano to save to API
-const _origSalvarNovoPlano = salvarNovoPlano;
-salvarNovoPlano = async function() {
-  _origSalvarNovoPlano();
-  if(authToken) {
-    const pr = DB.produtos.find(p=>p.id===parseInt(document.getElementById('np_produto')?.value));
-    const lastPlano = pr?.planos?.[pr.planos.length-1];
-    if(lastPlano && pr) {
-      const result = await api.post('/api/produtos', {tipo:'plano', produto_id: pr.id, ...lastPlano});
-      if(result && result.id) lastPlano._dbId = result.id;
-    }
-  }
-};
-
-// Override editarComissaoPlano to save to API
-const _origSalvarComissaoPlano = salvarComissaoPlano;
-salvarComissaoPlano = async function() {
-  _origSalvarComissaoPlano();
-  if(authToken) {
-    const prodId = parseInt(document.getElementById('ecp_prod_id').value);
-    const planoId = parseInt(document.getElementById('ecp_plano_id').value);
-    const pr = DB.produtos.find(p=>p.id===prodId);
-    const pl = pr?.planos?.find(x=>x.id===planoId);
-    if(pl) await api.put('/api/produtos', {tipo:'plano', id: planoId, ...pl});
-  }
-};
-
-
-
-// ===== SYNC LEADS CRIAÇÃO =====
-
-// Override criarLeadDeEntrega to save to API
-const _origCriarLead = criarLeadDeEntrega;
-criarLeadDeEntrega = async function(pedido) {
-  _origCriarLead(pedido);
-  if(authToken) {
-    const lead = DB.leads[DB.leads.length-1];
-    if(lead) {
-      const result = await api.post('/api/leads', lead);
-      if(result && result.id) lead.id = result.id;
-    }
-  }
-};
-
-// Override confirmarNegociacao to save followup to API
-const _origConfirmarNegociacao = confirmarNegociacao;
-confirmarNegociacao = async function() {
-  _origConfirmarNegociacao();
-  if(authToken && kbActiveLead) {
-    const lead = DB.leads.find(l=>l.id===kbActiveLead);
-    if(lead) await api.put('/api/leads', lead);
-  }
-};
-
-// Override concluirFollowupLead to save to API
-const _origConcluirFollowupLead = concluirFollowupLead;
-concluirFollowupLead = async function(leadId) {
-  _origConcluirFollowupLead(leadId);
-  if(authToken) {
-    const lead = DB.leads.find(x=>x.id===leadId);
-    if(lead) await api.put('/api/leads', lead);
-  }
-};
-
-// Override confirmarPerdaExecutar to delete lead from API
-const _origConfirmarPerda = confirmarPerdaExecutar;
-confirmarPerdaExecutar = async function() {
-  const id = kbActiveLead;
-  _origConfirmarPerda();
-  if(authToken && id) await api.delete('/api/leads?id='+id);
-};
-
-
-
-// ===== SYNC USUARIOS EDIÇÃO =====
-
-// Override editarUsuario save button to use API
-const _origEditarUsuario = editarUsuario;
-editarUsuario = function(id) {
-  _origEditarUsuario(id);
-  // Override the update button to also call API
-  setTimeout(()=>{
-    const btn = document.querySelector('#modalUsuario .btn-primary');
-    if(btn && btn.textContent === 'Atualizar'){
-      const origOnclick = btn.onclick;
-      btn.onclick = async function() {
-        origOnclick();
-        if(authToken) {
-          const u = DB.users.find(x=>x.id===id);
-          if(u) {
-            const senha = document.getElementById('u_senha')?.value;
-            await api.put('/api/usuarios', {
-              id: u.id,
-              nome: u.nome,
-              email: u.email,
-              tipo: u.tipo,
-              vendedores: u.vendedores||[],
-              cobradores: u.cobradores||[],
-              ...(senha ? {senha} : {})
-            });
-          }
-        }
-      };
-    }
-  }, 100);
-};
-
-// Override deleteUser to delete from API
-const _origDeleteUser = deleteUser;
-deleteUser = async function(id) {
-  _origDeleteUser(id);
-  if(authToken) await api.delete('/api/usuarios?id='+id);
-};
-
 
 // ===== END API INTEGRATION =====
 
@@ -7642,10 +7489,19 @@ function renderRanking(){
 
 
 function renderPlanos(){
-  // Populate produto select in modal
+  // Populate produto select in modal - always refresh
   const sel = document.getElementById('np_produto');
-  if(sel && sel.options.length<=1){
-    DB.produtos.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.nome; sel.appendChild(o); });
+  if(sel){
+    sel.innerHTML = '<option value="">Selecione o produto...</option>';
+    DB.produtos.filter(p=>!p.inativo).forEach(p=>{
+      const o=document.createElement('option');
+      o.value=p.id;
+      o.textContent=p.nome;
+      sel.appendChild(o);
+    });
+    if(!DB.produtos.length){
+      sel.innerHTML = '<option value="">Nenhum produto cadastrado</option>';
+    }
   }
 
   const tbody = document.getElementById('planos_tbody');
@@ -9204,7 +9060,6 @@ function openModal(id){
   if(id==='modalProduto'){
     document.getElementById('planosContainer').innerHTML='';
     planoRowId=0;
-    addPlanoRow();
   }
   if(id==='modalClientePedido'){
     populateProdutosSelect();
@@ -9362,13 +9217,7 @@ document.getElementById('appWrap').style.display='none';
     <div class="form-group"><label>Categoria</label><input id="pr_categoria" placeholder="Ex: Software, Físico, Serviço..."></div>
     <div class="form-group"><label>Status</label><select id="pr_status"><option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option></select></div>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px">
-    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--blue)">Planos</div>
-    <button class="btn btn-ghost btn-sm" onclick="addPlanoRow()">+ Adicionar Plano</button>
-  </div>
-  <div id="planosContainer" style="display:flex;flex-direction:column;gap:8px">
-    <!-- plano rows adicionados dinamicamente -->
-  </div>
+  <div id="planosContainer" style="display:none"></div>
   <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
     <button class="btn btn-ghost" onclick="closeModal('modalProduto')">Cancelar</button>
     <button class="btn btn-primary" onclick="saveProduto()">Salvar Produto</button>
