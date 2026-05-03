@@ -9133,18 +9133,33 @@ function abrirLinkPayT(pedidoId){
   const p = DB.clientes_pedidos.find(x=>x.id===pedidoId);
   if(!p){ alert('Pedido não encontrado.'); return; }
 
-  // Find checkout_id from plano
+  // Find checkout_id - try by plano_nome first, then produto_nome, then any plano with id
   let checkoutId = '';
+  let foundPlanoNome = '';
+
   for(const prod of DB.produtos){
-    const plano = prod.planos?.find(pl=>pl.nome===p.plano_nome);
+    // Try exact plano name match
+    let plano = prod.planos?.find(pl=>pl.nome===p.plano_nome);
+    // Try product name match - get first plano with checkout id
+    if(!plano && prod.nome===p.produto_nome){
+      plano = prod.planos?.find(pl=>pl.payt_checkout_id);
+    }
+    // Try partial match
+    if(!plano){
+      plano = prod.planos?.find(pl=>pl.payt_checkout_id && (
+        p.plano_nome?.toLowerCase().includes(pl.nome?.toLowerCase()) ||
+        pl.nome?.toLowerCase().includes(p.plano_nome?.toLowerCase())
+      ));
+    }
     if(plano && plano.payt_checkout_id){
       checkoutId = plano.payt_checkout_id;
+      foundPlanoNome = plano.nome;
       break;
     }
   }
 
   if(!checkoutId){
-    alert('Configure o Checkout ID do Payt no cadastro do plano "'+p.plano_nome+'" (aba Planos → editar → campo Payt Checkout ID).');
+    alert('Configure o Checkout ID do Payt em algum plano do produto "'+p.produto_nome+'" (aba Planos → editar → campo Payt Checkout ID).');
     return;
   }
 
@@ -9165,7 +9180,19 @@ function abrirLinkPayT(pedidoId){
   if(tel)  url += `&phone=${tel}`;
   if(addr) url += `&address=${addr}`;
 
-  window.open(url, '_blank');
+  // Copy to clipboard instead of opening
+  navigator.clipboard.writeText(url).then(()=>{
+    showCopyToast('Link PayT copiado!');
+  }).catch(()=>{
+    // Fallback
+    const el = document.createElement('textarea');
+    el.value = url;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showCopyToast('Link PayT copiado!');
+  });
 }
 
 // ===== MODALS =====
