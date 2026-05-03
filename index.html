@@ -4706,9 +4706,11 @@ async function dispararWebhook(evento, payload){
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({evento, payload, data: new Date().toISOString()})
       });
-      wh.logs.unshift({status: r.status, data: new Date().toISOString(), resumo: payload});
+      const resumo = typeof payload==='object' ? (payload.nome+' — '+payload.codigo_rastreio) : payload;
+      wh.logs.unshift({status: r.status, data: new Date().toISOString(), resumo});
     } catch(e) {
-      wh.logs.unshift({status: 500, data: new Date().toISOString(), resumo: 'Erro: '+e.message});
+      const resumoErr = typeof payload==='object' ? (payload.nome||'') : payload;
+      wh.logs.unshift({status: 500, data: new Date().toISOString(), resumo: 'Erro: '+e.message+' | '+resumoErr});
     }
     if(wh.logs.length > 20) wh.logs = wh.logs.slice(0,20);
     if(document.getElementById('page-webhooks')?.classList.contains('active')) renderWebhooks();
@@ -5510,7 +5512,21 @@ function atualizarStatusRastreio(pedidoId, novoStatus){
     RETIRAR:'rastreamento.retirar_correios',
     FALHOU:'rastreamento.entrega_falhou'
   };
-  dispararWebhook(eventoMap[novoStatus], p.cliente_nome+' — '+p.codigo_rastreio);
+  // Build rich payload for webhook
+  const pedWh = DB.clientes_pedidos.find(x=>x.nome===p.cliente_nome);
+  const whPayload = {
+    nome: p.cliente_nome,
+    telefone: pedWh?.tel || '',
+    cpf: pedWh?.cpf || '',
+    email: pedWh?.email || '',
+    plano: pedWh?.plano_nome || '',
+    produto: pedWh?.produto_nome || '',
+    valor: pedWh?.plano_preco || '',
+    codigo_rastreio: p.codigo_rastreio,
+    status: novoStatus,
+    data: new Date().toISOString()
+  };
+  dispararWebhook(eventoMap[novoStatus], whPayload);
   // Refresh kanban if open
   if(document.getElementById('page-kanban')?.classList.contains('active')) renderKanban();
   // Auto-create lead if delivered
