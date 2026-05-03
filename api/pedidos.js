@@ -23,13 +23,7 @@ export default async function handler(req, res) {
       if (user.tipo === 'ADMIN') {
         pedidos = await sql`SELECT * FROM pedidos ORDER BY created_at DESC`;
       } else if (user.tipo === 'COBRADOR') {
-        const cobrador = await sql`SELECT vendedores FROM usuarios WHERE id = ${user.id} LIMIT 1`;
-        const vendedores = cobrador[0]?.vendedores || [];
-        if (vendedores.length > 0) {
-          pedidos = await sql`SELECT * FROM pedidos WHERE vendedor_id = ANY(${vendedores}::int[]) OR vendedor_id IS NULL ORDER BY created_at DESC`;
-        } else {
-          pedidos = await sql`SELECT * FROM pedidos WHERE vendedor_id IS NULL ORDER BY created_at DESC`;
-        }
+        pedidos = await sql`SELECT * FROM pedidos WHERE cobrador_id = ${user.id} ORDER BY created_at DESC`;
       } else {
         pedidos = await sql`SELECT * FROM pedidos WHERE vendedor_id = ${user.id} ORDER BY created_at DESC`;
       }
