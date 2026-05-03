@@ -7910,6 +7910,10 @@ function togglePedidoExpand(id, rowEl){
             <div class="ped-expand-meta-val" style="color:var(--blue)">${p.email||'—'}</div>
           </div>
           <div>
+            <div class="ped-expand-meta-label">Telefone</div>
+            <div class="ped-expand-meta-val">${(()=>{const r=(p.tel||'').replace(/\D/g,'');return r.length===11?`(${r.slice(0,2)}) ${r.slice(2,7)}-${r.slice(7)}`:r.length===10?`(${r.slice(0,2)}) ${r.slice(2,6)}-${r.slice(6)}`:p.tel||'—'})()}</div>
+          </div>
+          <div>
             <div class="ped-expand-meta-label">Vendedor</div>
             <div style="display:flex;align-items:center;gap:6px">
               <div style="width:20px;height:20px;border-radius:50%;background:var(--blue-bg);color:var(--blue);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${vend?vend.nome.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'?'}</div>
