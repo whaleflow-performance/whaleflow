@@ -12,6 +12,10 @@ const statusMap = {
   'WAITING_PICKUP':         'RETIRAR',
 };
 
+function brazilDate() {
+  return new Date().toLocaleDateString('en-CA', {timeZone: 'America/Sao_Paulo'});
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -59,7 +63,7 @@ export default async function handler(req, res) {
           ${offer?.price||0},
           'PENDENTE',
           ${`Qtd: ${offer?.numberOfItems||1} | Projeto: ${body.project?.name||''}`},
-          CURRENT_DATE,
+          ${brazilDate()},
           ${orderId}
         )
         RETURNING *`;
@@ -74,11 +78,11 @@ export default async function handler(req, res) {
 
       const existing = await sql`SELECT id FROM rastreamentos WHERE id_externo = ${orderId} LIMIT 1`;
       if (existing.length) {
-        await sql`UPDATE rastreamentos SET codigo_rastreio=${trackingCode}, status_entrega='ENVIADO', ultima_atualizacao=CURRENT_DATE WHERE id=${existing[0].id}`;
+        await sql`UPDATE rastreamentos SET codigo_rastreio=${trackingCode}, status_entrega='ENVIADO', ultima_atualizacao=${brazilDate()} WHERE id=${existing[0].id}`;
       } else {
         await sql`
           INSERT INTO rastreamentos (cliente_nome, codigo_rastreio, status_entrega, data_envio, ultima_atualizacao, id_externo)
-          VALUES (${nome}, ${trackingCode}, 'ENVIADO', CURRENT_DATE, CURRENT_DATE, ${orderId})`;
+          VALUES (${nome}, ${trackingCode}, 'ENVIADO', ${brazilDate()}, ${brazilDate()}, ${orderId})`;
       }
 
       return res.status(200).json({ ok: true, status: 'ENVIADO', tracking: trackingCode });
@@ -94,11 +98,11 @@ export default async function handler(req, res) {
 
       const existing = await sql`SELECT id FROM rastreamentos WHERE id_externo = ${orderId} LIMIT 1`;
       if (existing.length) {
-        await sql`UPDATE rastreamentos SET status_entrega=${wfStatus}, ultima_atualizacao=CURRENT_DATE WHERE id=${existing[0].id}`;
+        await sql`UPDATE rastreamentos SET status_entrega=${wfStatus}, ultima_atualizacao=${brazilDate()} WHERE id=${existing[0].id}`;
       } else {
         await sql`
           INSERT INTO rastreamentos (cliente_nome, codigo_rastreio, status_entrega, data_envio, ultima_atualizacao, id_externo)
-          VALUES (${nome}, ${trackingCode}, ${wfStatus}, CURRENT_DATE, CURRENT_DATE, ${orderId})`;
+          VALUES (${nome}, ${trackingCode}, ${wfStatus}, ${brazilDate()}, ${brazilDate()}, ${orderId})`;
       }
 
       if (wfStatus === 'ENTREGUE') {
@@ -107,7 +111,7 @@ export default async function handler(req, res) {
           const valor = pedido.length ? (pedido[0].plano_preco||0) : (offer?.price||0);
           await sql`
             INSERT INTO leads (cliente_nome, valor_divida, status_pipeline, prioridade, ultima_interacao)
-            VALUES (${nome}, ${valor}, 'D1', 'RISCO', CURRENT_DATE)`;
+            VALUES (${nome}, ${valor}, 'D1', 'RISCO', ${brazilDate()})`;
         }
       }
 
