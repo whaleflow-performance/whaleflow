@@ -2886,7 +2886,11 @@ function renderAdminDash(){
   const dashAte = document.getElementById('dash_data_ate')?.value || hoje;
 
   // Use clientes_pedidos as source of truth
-  const pedidosPer = DB.clientes_pedidos.filter(p=>(!dashDe||p.data>=dashDe)&&(!dashAte||p.data<=dashAte));
+  // Normalize date to YYYY-MM-DD for comparison
+  const pedidosPer = DB.clientes_pedidos.filter(p=>{
+    const d = (p.data||'').toString().slice(0,10);
+    return (!dashDe||d>=dashDe)&&(!dashAte||d<=dashAte);
+  });
   // Agendado = PENDENTE ou ANALISE (ainda nao pago, entregue ou nao)
   const sched      = pedidosPer.filter(p=>['PENDENTE','ANALISE'].includes(p.pagamento));
   // Pago = PAGO
